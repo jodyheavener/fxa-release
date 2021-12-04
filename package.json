@@ -2,8 +2,8 @@
   "name": "fxa-release",
   "version": "0.1.0",
   "description": "A CLI for managing releases in Firefox Accounts",
-  "repository": "https://github.com/mozilla-fxa/fxa-release",
-  "author": "Jody Heavener <jheavener@mozilla.com>",
+  "repository": "https://github.com/jodyheavener/fxa-release",
+  "author": "Jody Heavener <j.heavener@gmail.com>",
   "license": "MPL-2.0",
   "main": "dist/fxa-release.js",
   "bin": {
@@ -15,12 +15,14 @@
     "dist": "yarn build --minify",
     "cli": "node ./dist/fxa-release.js"
   },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^8.3.0",
+    "inquirer": "^8.2.0"
+  },
   "devDependencies": {
     "@types/inquirer": "^8.1.3",
-    "chalk": "^5.0.0",
-    "commander": "^8.3.0",
     "esbuild": "^0.14.1",
-    "inquirer": "^8.2.0",
     "typescript": "^4.5.2"
   }
 }

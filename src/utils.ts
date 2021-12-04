@@ -7,11 +7,10 @@ import { prompt } from "inquirer";
 import { execSync } from "child_process";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import constants from "./constants";
+import { gitDefaults } from "./constants";
 
 const globals = {
-  command: "",
-  remote: constants.remote,
+  remote: gitDefaults.remote,
   dry: false,
   verbose: false,
   hasErrors: false,
@@ -100,13 +99,17 @@ export const error = (message: string, fatal: boolean = false, err?: any) => {
 };
 
 export const confirmPush = async ({
-  branch, tag, remote, version, save = true
+  branch,
+  tag,
+  remote,
+  version,
+  save = true,
 }: {
-  branch: string,
-  tag: string,
-  save?: boolean,
-  version?: string,
-  remote?: string
+  branch: string;
+  tag: string;
+  save?: boolean;
+  version?: string;
+  remote?: string;
 }) => {
   remote = remote || (getValue("remote") as string);
   const dry = getValue("dry") || false;

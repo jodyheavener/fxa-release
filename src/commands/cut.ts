@@ -67,7 +67,7 @@ const getTrainBranch = (type: "local" | "remote", train: number) => {
       exists: exists(
         execute(
           "git branch --no-color",
-          `Looking up local branches to see if ${localName} branch exists.`
+          `Inspecting local branches to see if ${localName} branch exists.`
         ),
         localName
       ),
@@ -79,7 +79,7 @@ const getTrainBranch = (type: "local" | "remote", train: number) => {
       exists: exists(
         execute(
           "git branch --no-color -r",
-          `Looking up remote branches to see if ${remoteName} branch exists.`
+          `Inspecting remote branches to see if ${remoteName} branch exists.`
         ),
         remoteName
       ),

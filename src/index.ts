@@ -4,8 +4,8 @@
 
 import { program, Option, Command } from "commander";
 import pckg from "../package.json";
-import { cut, push, versions } from "./commands";
-import constants from "./constants";
+import { cut, push, status, guide } from "./commands";
+import { gitDefaults } from "./constants";
 
 program.version(pckg.version).description(pckg.description);
 
@@ -19,11 +19,11 @@ const options = {
     new Option(
       "-r, --remote <name>",
       "the name of the git remote to use"
-    ).default(constants.remote),
+    ).default(gitDefaults.remote),
     new Option(
       "-b, --default-branch <name>",
       "the name of the default git branch"
-    ).default(constants.defaultBranch),
+    ).default(gitDefaults.branch),
   ],
 };
 
@@ -66,25 +66,24 @@ addCommand(
   "Push changes from a release in progress",
   [
     ...options.git,
-    new Option(
-      "-rs, --release <version>",
-      "the version to continue releasing"
-    ),
+    new Option("-rs, --release <version>", "the version to continue releasing"),
   ],
   push
 );
 
 addCommand(
-  "versions",
-  "Retrieve release versions",
+  "status",
+  "Retrieve the status of the current release",
   [
     new Option("-s, --service [name]", "the name of an FxA service to look up"),
     new Option(
-      "-r, --remote",
+      "--deployed",
       "retrieve version data from deployed services"
     ).default(false),
   ],
-  versions
+  status
 );
+
+addCommand("guide", "Print helpful release information", [], guide);
 
 program.parse();

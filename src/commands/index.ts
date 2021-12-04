@@ -4,4 +4,5 @@
 
 export { default as cut } from "./cut";
 export { default as push } from "./push";
-export { default as versions } from "./versions";
+export { default as status } from "./status";
+export { default as guide } from "./guide";
