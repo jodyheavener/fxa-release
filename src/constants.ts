@@ -6,3 +6,5 @@ export const gitDefaults = {
   remote: "origin",
   branch: "main",
 };
+
+export const repoUrl = "https://github.com/mozilla/fxa";

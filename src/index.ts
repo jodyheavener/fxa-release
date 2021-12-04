@@ -5,26 +5,25 @@
 import { program, Option, Command } from "commander";
 import pckg from "../package.json";
 import { cut, push, status, guide } from "./commands";
+import { serviceInfo } from "./commands/status";
 import { gitDefaults } from "./constants";
+import { commaSeparatedList } from "./utils";
 
 program.version(pckg.version).description(pckg.description);
 
 const options = {
-  global: [
-    new Option("--verbose", "output all operations to the console").default(
-      false
-    ),
-  ],
-  git: [
-    new Option(
-      "-r, --remote <name>",
-      "the name of the git remote to use"
-    ).default(gitDefaults.remote),
-    new Option(
-      "-b, --default-branch <name>",
-      "the name of the default git branch"
-    ).default(gitDefaults.branch),
-  ],
+  verbose: new Option(
+    "--verbose",
+    "output detailed information for the current command",
+  ).default(false),
+  remote: new Option(
+    "-r, --remote <name>",
+    "the name of the git remote to use"
+  ).default(gitDefaults.remote),
+  defaultBranch: new Option(
+    "-b, --default-branch <name>",
+    "the name of the default git branch"
+  ).default(gitDefaults.branch),
 };
 
 const addCommand = (
@@ -34,12 +33,12 @@ const addCommand = (
   action: (
     options: Record<string, any>,
     command: InstanceType<typeof Command>
-  ) => void
+  ) => Promise<void>
 ) => {
   const cutCommand = new Command(name);
   cutCommand.description(description);
   cutCommand.action(action);
-  [...options.global, ...additionalOptions].forEach((option) => {
+  [options.verbose, ...additionalOptions].forEach((option) => {
     cutCommand.addOption(option);
   });
   program.addCommand(cutCommand);
@@ -49,7 +48,8 @@ addCommand(
   "cut",
   "Cut a new release",
   [
-    ...options.git,
+    options.remote,
+    options.defaultBranch,
     new Option("-t, --type <type>", "the release build type")
       .choices(["train", "patch"])
       .default("train"),
@@ -65,7 +65,8 @@ addCommand(
   "push",
   "Push changes from a release in progress",
   [
-    ...options.git,
+    options.remote,
+    options.defaultBranch,
     new Option("-rs, --release <version>", "the version to continue releasing"),
   ],
   push
@@ -73,17 +74,28 @@ addCommand(
 
 addCommand(
   "status",
-  "Retrieve the status of the current release",
+  "Retrieve the statuses of FxA services",
   [
-    new Option("-s, --service [name]", "the name of an FxA service to look up"),
     new Option(
-      "--deployed",
-      "retrieve version data from deployed services"
-    ).default(false),
+      "-e, --environment <name>",
+      "the environment to retrieve version data from"
+    )
+      .choices(["production", "staging", "development"])
+      .default("production"),
+    new Option(
+      "-s, --services [name]",
+      "comma-separated list of services to retrieve version data for (defaults to all)"
+    )
+      .choices(Object.keys(serviceInfo))
+      .argParser(commaSeparatedList),
+    new Option(
+      "-x, --exclude [name]",
+      "comma-separated list of services to exclude from retrieval"
+    ).argParser(commaSeparatedList),
   ],
   status
 );
 
-addCommand("guide", "Print helpful release information", [], guide);
+addCommand("guide", "Display helpful release information", [], guide);
 
 program.parse();

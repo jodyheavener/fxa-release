@@ -4,6 +4,7 @@
 
 import chalk from "chalk";
 import { Command } from "commander";
+import { visibleLink, wrapCommand } from "../utils";
 
 const definitions = {
   Release:
@@ -20,13 +21,23 @@ const definitions = {
     "The Remote is the external Git repository we push Release commits and tags to.",
 };
 
-export default (
-  opts: Record<string, any>,
-  command: InstanceType<typeof Command>
-) => {
-  console.log(
-    Object.keys(definitions)
-      .map((d) => `${chalk.white(d)} - ${definitions[d]}`)
-      .join("\n")
-  );
-};
+export default wrapCommand(
+  (opts: Record<string, any>, _: InstanceType<typeof Command>) => {
+    console.log(chalk.white("About\n"));
+    console.log(
+      "The Firefox Accounts team, or FxA, regularly releases new versions of all the Services in its monorepo. We use Git tags to mark each Release. This CLI is designed to aid in the release process, and as the Owner you can use it to prepare, create, and push new Releases.\n"
+    );
+    console.log(
+      `More detailed information about the release process can be found in our Ecosystem Platform documentation: ${visibleLink(
+        "https://mozilla.github.io/ecosystem-platform/docs/fxa-engineering/release-process"
+      )}`
+    );
+
+    console.log(chalk.white("\nGlossary\n"));
+    console.log(
+      Object.keys(definitions)
+        .map((d) => `${chalk.blue(d)} - ${chalk.italic(definitions[d])}`)
+        .join("\n")
+    );
+  }
+);

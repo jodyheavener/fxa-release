@@ -5,7 +5,7 @@
 import { Command } from "commander";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { setValue, validateExecution } from "../utils";
+import { wrapCommand } from "../utils";
 
 let options: {
   version: string;
@@ -19,16 +19,12 @@ const retrieveVersionData = () => {
   return JSON.parse(readFileSync(path, "utf8"));
 };
 
-export default (
-  opts: Record<string, any>,
-  command: InstanceType<typeof Command>
-) => {
-  setValue("remote", opts.remote);
-  setValue("verbose", opts.verbose);
-  options = opts as typeof options;
+export default wrapCommand(
+  (opts: Record<string, any>, _: InstanceType<typeof Command>) => {
+    // options = opts as typeof options;
 
-  validateExecution(options.remote);
-  const data = retrieveVersionData();
+    // const data = retrieveVersionData();
 
-  console.log(data);
-};
+    // console.log(data);
+  }
+);
