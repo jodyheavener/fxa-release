@@ -7,17 +7,15 @@ import { Command } from "commander";
 import {
   capitalize,
   execute,
-  getValue,
-  setValue,
   confirmPush,
-  assertNotNull,
+  assertPresence,
   wrapCommand,
   logError,
   parseVersion,
   logDryMessage,
-  loadingIndicator,
   createEnvVar,
   unpad,
+  assertAbsense,
 } from "../utils";
 
 let options: {
@@ -135,7 +133,8 @@ export default wrapCommand(
 
       if (currentBranch === options.defaultBranch) {
         logError(
-          `You are trying to release a Patch on the default ${options.defaultBranch} branch. Please switch to a Train branch.`
+          `You are trying to release a Patch on the default ${options.defaultBranch} branch. Please switch to a Train branch.`,
+          true
         );
       }
     }
@@ -152,28 +151,24 @@ export default wrapCommand(
       getTrainVersions(lastTag);
     const localTrainBranch = getTrainBranch("local", nextVersion.train);
 
-    if (
-      execute(
-        "git status --porcelain",
-        "Ensuring the current branch is clean."
-      ) !== ""
-    ) {
-      logError(
-        `The current branch (${currentBranch}) is not clean. Please commit or stash your changes before releasing.`,
-        true
+    try {
+      assertAbsense(
+        execute(
+          "git status --porcelain",
+          "Ensuring the current branch is clean."
+        ),
+        `The current branch (${currentBranch}) is not clean. Please commit or stash your changes before releasing.`
       );
-    }
 
-    if (
-      execute(
-        `git log ${lastTag}..HEAD --pretty=oneline --abbrev-commit`,
-        "Ensure there are new commits on the current branch since the last tagging."
-      ) === ""
-    ) {
-      logError(
-        `The current branch (${currentBranch}) has no new commits since the last release tag (${lastTag}).`,
-        true
+      assertPresence(
+        execute(
+          `git log ${lastTag}..HEAD --pretty=oneline --abbrev-commit`,
+          "Ensure there are new commits on the current branch since the last tagging."
+        ),
+        `The current branch (${currentBranch}) has no new commits since the last release tag (${lastTag}).`
       );
+    } catch (error) {
+      logError(error.message, true);
     }
 
     // If current branch is train branch, pull from remote.

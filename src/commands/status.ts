@@ -7,7 +7,7 @@ import { Command } from "commander";
 import fetch from "node-fetch";
 import terminalLink from "terminal-link";
 import {
-  assertNotNull,
+  assertPresence,
   loadingIndicator,
   logError,
   logInfo,
@@ -145,10 +145,13 @@ export default wrapCommand(
       const url = service[environment];
       const restricted = service.restricted || false;
 
-      if (!url || url === "") {
-        logInfo(
+      try {
+        assertPresence(
+          url,
           "A URL for the service in this environment is not available; skipping"
         );
+      } catch (error) {
+        logInfo(error.message);
         continue;
       }
 
@@ -176,7 +179,7 @@ export default wrapCommand(
           console.log(json);
         }
 
-        assertNotNull(
+        assertPresence(
           [version, commit],
           "Could not locate version and commit values for service endpoint"
         );

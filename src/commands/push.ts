@@ -7,7 +7,7 @@ import { Command } from "commander";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { releasesPath } from "../constants";
 import {
-  assertNotNull,
+  assertPresence,
   confirmPush,
   createReleaseFilePath,
   ensureReleasesPath,
@@ -76,7 +76,7 @@ export default wrapCommand(
         console.log(response);
       }
 
-      assertNotNull(
+      assertPresence(
         [branch, tag],
         "Required data not found in saved Release file"
       );

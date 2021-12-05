@@ -61,11 +61,29 @@ export const assert = (condition: boolean, message: string) => {
   }
 };
 
-export const assertNotNull = (values: any[], message: string) =>
+export function assertPresence(values: string, message: string): void;
+export function assertPresence(values: any[], message: string): void;
+export function assertPresence(values: any, message: string): void {
+  if (!Array.isArray(values)) {
+    values = [values];
+  }
   assert(
-    values.every((part) => part != null),
+    values.every((part) => part != null && part !== ""),
     message
   );
+};
+
+export function assertAbsense(values: string, message: string): void;
+export function assertAbsense(values: any[], message: string): void;
+export function assertAbsense(values: any, message: string): void {
+  if (!Array.isArray(values)) {
+    values = [values];
+  }
+  assert(
+    values.every((part) => part == null || part === ""),
+    message
+  );
+};
 
 // Interface
 
