@@ -4,6 +4,7 @@
 
 import chalk from "chalk";
 import { Command } from "commander";
+import { repoUrl } from "../constants";
 import { visibleLink, wrapCommand } from "../utils";
 
 const definitions = {
@@ -28,7 +29,12 @@ export default wrapCommand(
       "The Firefox Accounts team, or FxA, regularly releases new versions of all the Services in its monorepo. We use Git tags to mark each Release. This CLI is designed to aid in the release process, and as the Owner you can use it to prepare, create, and push new Releases.\n"
     );
     console.log(
-      `More detailed information about the release process can be found in our Ecosystem Platform documentation: ${visibleLink(
+      `The main Firefox Accounts repository can be found at: ${visibleLink(
+        repoUrl
+      )}`
+    );
+    console.log(
+      `\nMore detailed information about the release process can be found in our Ecosystem Platform documentation: ${visibleLink(
         "https://mozilla.github.io/ecosystem-platform/docs/fxa-engineering/release-process"
       )}`
     );

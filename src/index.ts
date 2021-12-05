@@ -7,23 +7,24 @@ import pckg from "../package.json";
 import { cut, push, status, guide } from "./commands";
 import { serviceInfo } from "./commands/status";
 import { gitDefaults } from "./constants";
-import { commaSeparatedList } from "./utils";
+import { commaSeparatedList, createEnvVar } from "./utils";
 
 program.version(pckg.version).description(pckg.description);
 
 const options = {
   verbose: new Option(
     "--verbose",
-    "output detailed information for the current command",
+    "output detailed information for the current command"
   ).default(false),
-  remote: new Option(
-    "-r, --remote <name>",
-    "the name of the git remote to use"
-  ).default(gitDefaults.remote),
+  remote: new Option("-r, --remote <name>", "the name of the git remote to use")
+    .default(gitDefaults.remote)
+    .env(createEnvVar("remote")),
   defaultBranch: new Option(
     "-b, --default-branch <name>",
     "the name of the default git branch"
-  ).default(gitDefaults.branch),
+  )
+    .default(gitDefaults.branch)
+    .env(createEnvVar("default_branch")),
 };
 
 const addCommand = (
@@ -35,13 +36,15 @@ const addCommand = (
     command: InstanceType<typeof Command>
   ) => Promise<void>
 ) => {
-  const cutCommand = new Command(name);
-  cutCommand.description(description);
-  cutCommand.action(action);
+  const command = new Command(name);
+  command.description(description);
+  command.action(action);
   [options.verbose, ...additionalOptions].forEach((option) => {
-    cutCommand.addOption(option);
+    command.addOption(option);
   });
-  program.addCommand(cutCommand);
+
+  program.addCommand(command);
+  return program;
 };
 
 addCommand(
@@ -50,12 +53,17 @@ addCommand(
   [
     options.remote,
     options.defaultBranch,
-    new Option("-t, --type <type>", "the release build type")
+    new Option("-t, --type <type>", "the Release build type")
       .choices(["train", "patch"])
-      .default("train"),
+      .default("train")
+      .env(createEnvVar("release_type")),
     new Option(
       "-d, --dry",
       "perform a dry run, where no changes are made"
+    ).default(false),
+    new Option(
+      "-f, --force",
+      "set the env var FXAR_REQUIRE_FORCE=1 to require this flag when cutting a new Release"
     ).default(false),
   ],
   cut
@@ -63,11 +71,11 @@ addCommand(
 
 addCommand(
   "push",
-  "Push changes from a release in progress",
+  "Push changes from a Release in progress",
   [
+    new Option("--id <value>", "the ID of the in-progress Release to push"),
     options.remote,
     options.defaultBranch,
-    new Option("-rs, --release <version>", "the version to continue releasing"),
   ],
   push
 );
@@ -81,21 +89,25 @@ addCommand(
       "the environment to retrieve version data from"
     )
       .choices(["production", "staging", "development"])
-      .default("production"),
+      .default("production")
+      .env(createEnvVar("environment")),
     new Option(
       "-s, --services [name]",
-      "comma-separated list of services to retrieve version data for (defaults to all)"
+      "comma-separated list of Services to retrieve version data for (defaults to all)"
     )
       .choices(Object.keys(serviceInfo))
-      .argParser(commaSeparatedList),
+      .argParser(commaSeparatedList)
+      .env(createEnvVar("services_include")),
     new Option(
       "-x, --exclude [name]",
-      "comma-separated list of services to exclude from retrieval"
-    ).argParser(commaSeparatedList),
+      "comma-separated list of Services to exclude from retrieval"
+    )
+      .argParser(commaSeparatedList)
+      .env(createEnvVar("services_exclude")),
   ],
   status
 );
 
-addCommand("guide", "Display helpful release information", [], guide);
+addCommand("guide", "Display helpful Release information", [], guide);
 
 program.parse();

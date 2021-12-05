@@ -268,7 +268,7 @@ export default wrapCommand(
       await confirmPush({
         branch: localTrainBranch.name,
         tag: nextVersion.tag,
-      });
+      }, true);
 
       complete();
     } catch (err) {

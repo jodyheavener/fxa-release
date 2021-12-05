@@ -5,9 +5,9 @@
 import chalk from "chalk";
 import { prompt } from "inquirer";
 import { execSync } from "child_process";
-import { readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import { gitDefaults } from "./constants";
+import { envVarPrefix, gitDefaults, releasesPath } from "./constants";
 import logUpdate from "log-update";
 import { Command } from "commander";
 import terminalLink from "terminal-link";
@@ -50,6 +50,9 @@ export const parseVersion = (value: string) => {
 
 export const visibleLink = (url: string) => chalk.cyan(terminalLink(url, url));
 
+export const createEnvVar = (name: string) =>
+  `${envVarPrefix}_${name}`.toUpperCase();
+
 // Assertions
 
 export const assert = (condition: boolean, message: string) => {
@@ -83,6 +86,7 @@ export const logError = (
   err && console.trace(err);
 
   if (fatal) {
+    completeCommand();
     console.error("\u0007");
     process.exit(1);
   }
@@ -103,23 +107,27 @@ export const loadingIndicator = (message: string) => {
   };
 };
 
-// Lifecycle
+// Command execution
 
 export const wrapCommand =
   (
     fn: (
       opts: Record<string, any>,
-      command: InstanceType<typeof Command>
+      program: InstanceType<typeof Command>
     ) => void | Promise<void>
   ) =>
-  async (opts: Record<string, any>, command: InstanceType<typeof Command>) => {
+  async (opts: Record<string, any>, program: InstanceType<typeof Command>) => {
     for (const key in opts) {
       if (key in globals) {
         setValue(key as any, opts[key]);
       }
     }
     validateCommand(opts.remote);
-    await fn(opts, command);
+    try {
+      await fn(opts, program);
+    } catch (err) {
+      logError("The command failed in a big way", true, err);
+    }
     completeCommand();
   };
 
@@ -158,6 +166,92 @@ const completeCommand = () => {
   } else if (getValue("hasWarnings")) {
     console.log(chalk.yellow("\nCompleted with warnings."));
   }
+};
+
+// File system
+
+export const ensureReleasesPath = () => {
+  if (!existsSync(releasesPath)) {
+    mkdirSync(releasesPath);
+  }
+};
+
+export const createReleaseFilePath = (id: string) => {
+  ensureReleasesPath();
+  return join(releasesPath, id + ".json");
+};
+
+// Release operations
+
+export type ReleaseData = {
+  branch: string;
+  tag: string;
+};
+
+export const getCurrentBranch = () =>
+  execute("git rev-parse --abbrev-ref HEAD", "Retrieving the current branch.");
+
+export const confirmPush = async (
+  { branch, tag }: ReleaseData,
+  save: boolean,
+  id?: string
+) => {
+  const remote = getValue("remote");
+  // const dry = getValue("dry") || false;
+  const command = `git push ${remote} ${branch}:${branch} && git push ${remote} ${tag}`;
+
+  // if (dry) {
+  //   return logInfo2(
+  //     "Asking for confirmation to push changes.",
+  //     `${chalk.blue("conditional:")} ${command}`
+  //   );
+  // }
+
+  console.log(
+    `${chalk.yellow(
+      "Important:"
+    )} You are about to push the commits on branch ${chalk.white(
+      branch
+    )} and the tag ${chalk.white(tag)} to remote ${chalk.white(
+      remote
+    )}. This may trigger CI jobs.`
+  );
+  const { confirm } = (await prompt({
+    type: "input",
+    name: "confirm",
+    message: "Type 'push' to confirm. Any other response will abort.",
+  })) as { confirm: string };
+
+  if (confirm !== "push") {
+    if (save) {
+      id = new Date().getTime().toString();
+      writeFileSync(
+        createReleaseFilePath(id),
+        JSON.stringify(
+          {
+            branch,
+            tag,
+          },
+          null,
+          2
+        )
+      );
+    }
+
+    return console.log(
+      `${chalk.yellow(
+        "\nYour changes have not been pushed."
+      )} When you are ready to push you can run the following:\n${chalk.white.bold(
+        `fxa-release push --id ${id}`
+      )}`
+    );
+  }
+
+  execute(
+    command,
+    `Pushing Release commits and tag to remote ${remote}.`,
+    true
+  );
 };
 
 //// NEEDS SORTING =============
@@ -200,67 +294,4 @@ export const error = (message: string, fatal: boolean = false, err?: any) => {
   }
 
   logError(message);
-};
-
-export const confirmPush = async ({
-  branch,
-  tag,
-  remote,
-  version,
-  save = true,
-}: {
-  branch: string;
-  tag: string;
-  save?: boolean;
-  version?: string;
-  remote?: string;
-}) => {
-  remote = remote || (getValue("remote") as string);
-  const dry = getValue("dry") || false;
-  const command = `git push ${remote} ${branch} && git push ${remote} ${tag}`;
-
-  if (dry) {
-    return logInfo2(
-      "Asking for confirmation to push changes.",
-      `${chalk.blue("conditional:")} ${command}`
-    );
-  }
-
-  console.log(
-    `⚠️ Proceeding will push the current release changes to ${remote}/${branch}`
-  );
-  const { confirm } = (await prompt({
-    type: "input",
-    name: "confirm",
-    message: "Please type 'push' to confirm. Any other response will abort.",
-  })) as { confirm: string };
-
-  if (confirm !== "push") {
-    if (save) {
-      version = new Date().getTime().toString();
-      writeFileSync(
-        join(__dirname, "releases", `${version}.json`),
-        JSON.stringify({
-          version,
-          branch,
-          tag,
-          remote,
-        })
-      );
-    }
-
-    return console.log(
-      chalk.yellow("\nYour changes have not been pushed."),
-      "When you are reading to push you should run the following:\n",
-      chalk.white(`yarn release push --version ${version}`)
-    );
-  }
-
-  execute(
-    command,
-    `Pushing release commit and tag to ${remote}/${branch}.`,
-    true
-  );
-
-  // TODO: print post-push message
 };
