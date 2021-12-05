@@ -25,6 +25,10 @@ const options = {
   )
     .default(gitDefaults.branch)
     .env(createEnvVar("default_branch")),
+  dryRun: new Option(
+    "-d, --dry",
+    "perform a dry run, where no changes are made"
+  ).default(false),
 };
 
 const addCommand = (
@@ -51,16 +55,13 @@ addCommand(
   "cut",
   "Cut a new release",
   [
-    options.remote,
-    options.defaultBranch,
     new Option("-t, --type <type>", "the Release build type")
       .choices(["train", "patch"])
       .default("train")
       .env(createEnvVar("release_type")),
-    new Option(
-      "-d, --dry",
-      "perform a dry run, where no changes are made"
-    ).default(false),
+    options.remote,
+    options.defaultBranch,
+    options.dryRun,
     new Option(
       "-f, --force",
       "set the env var FXAR_REQUIRE_FORCE=1 to require this flag when cutting a new Release"
@@ -74,6 +75,7 @@ addCommand(
   "Push changes from a Release in progress",
   [
     new Option("--id <value>", "the ID of the in-progress Release to push"),
+    options.dryRun,
     options.remote,
     options.defaultBranch,
   ],

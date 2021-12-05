@@ -71,6 +71,25 @@ export const assertNotNull = (values: any[], message: string) =>
 
 export const logInfo = (message: string) => console.log(chalk.italic(message));
 
+export const logDryMessage = (
+  message: string,
+  type: "info" | "warning" | "error" = "info"
+) => {
+  if (!getValue("dry")) {
+    return;
+  }
+
+  let prefix = "";
+
+  if (type === "warning") {
+    prefix = chalk.yellow("Warning: ");
+  } else if (type === "error") {
+    prefix = chalk.red("Error: ");
+  }
+
+  console.log(`- ${prefix}${message}`);
+};
+
 export const logWarning = (message: string) => {
   setValue("hasWarnings", true);
   console.log(`${chalk.yellow("Warning!")} ${message}`);
@@ -122,12 +141,21 @@ export const wrapCommand =
         setValue(key as any, opts[key]);
       }
     }
+
+    if (getValue("dry")) {
+      console.log(
+        chalk.white("⚠  Dry run enabled. Critical commands will be skipped.\n")
+      );
+    }
+
     validateCommand(opts.remote);
+
     try {
       await fn(opts, program);
     } catch (err) {
       logError("The command failed in a big way", true, err);
     }
+
     completeCommand();
   };
 
@@ -151,6 +179,25 @@ const validateCommand = (remote?: string) => {
 };
 
 const completeCommand = () => {
+  if (getValue("dry")) {
+    if (getValue("hasErrors")) {
+      console.log(
+        `\n${chalk.red(
+          "This command would have failed"
+        )}. Please correct the errors above and try again.`
+      );
+    } else {
+      console.log(
+        `\n${chalk.green(
+          "Dry run complete!"
+        )} If everything above looks good, re-run the command without the ${chalk.white(
+          "--dry"
+        )} flag to perform it for real.`
+      );
+    }
+    return;
+  }
+
   if (getValue("hasErrors")) {
     console.log(
       chalk.red("\nThere were errors during the execution of this command.")
@@ -165,6 +212,8 @@ const completeCommand = () => {
     }
   } else if (getValue("hasWarnings")) {
     console.log(chalk.yellow("\nCompleted with warnings."));
+  } else {
+    console.log(chalk.green("\nCompleted successfully."));
   }
 };
 
@@ -183,13 +232,37 @@ export const createReleaseFilePath = (id: string) => {
 
 // Release operations
 
+export const execute = (
+  command: string,
+  description: string,
+  drySkip: boolean = false
+) => {
+  const skip = drySkip && getValue("dry");
+  const prefix = skip ? chalk.yellow("skipped:") : chalk.green("executed:");
+
+  logDryMessage(description);
+
+  if (getValue("verbose")) {
+    if (!getValue("dry")) {
+      logInfo(description);
+    }
+
+    console.log(`↪ ${prefix} ${command}`);
+  }
+
+  try {
+    return skip
+      ? null
+      : execSync(command, { cwd: process.cwd() }).toString().trim();
+  } catch (error) {
+    return null;
+  }
+};
+
 export type ReleaseData = {
   branch: string;
   tag: string;
 };
-
-export const getCurrentBranch = () =>
-  execute("git rev-parse --abbrev-ref HEAD", "Retrieving the current branch.");
 
 export const confirmPush = async (
   { branch, tag }: ReleaseData,
@@ -197,18 +270,20 @@ export const confirmPush = async (
   id?: string
 ) => {
   const remote = getValue("remote");
-  // const dry = getValue("dry") || false;
   const command = `git push ${remote} ${branch}:${branch} && git push ${remote} ${tag}`;
 
-  // if (dry) {
-  //   return logInfo2(
-  //     "Asking for confirmation to push changes.",
-  //     `${chalk.blue("conditional:")} ${command}`
-  //   );
-  // }
+  if (getValue("dry")) {
+    logDryMessage("Asking for confirmation to push changes.");
+
+    if (getValue("verbose")) {
+      console.log(`↪ ${chalk.magenta("proposed:")} ${command}`);
+    }
+
+    return;
+  }
 
   console.log(
-    `${chalk.yellow(
+    `\n${chalk.yellow(
       "Important:"
     )} You are about to push the commits on branch ${chalk.white(
       branch
@@ -241,7 +316,7 @@ export const confirmPush = async (
     return console.log(
       `${chalk.yellow(
         "\nYour changes have not been pushed."
-      )} When you are ready to push you can run the following:\n${chalk.white.bold(
+      )} When you are ready to push you can run the following:\n${chalk.white(
         `fxa-release push --id ${id}`
       )}`
     );
@@ -252,46 +327,6 @@ export const confirmPush = async (
     `Pushing Release commits and tag to remote ${remote}.`,
     true
   );
-};
 
-//// NEEDS SORTING =============
-
-export const execute = (
-  command: string,
-  description: string,
-  drySkip: boolean = false
-) => {
-  const skip = drySkip && globals.dry;
-  const prefix = skip ? chalk.yellow("skipped:") : chalk.green("executed:");
-  logInfo2(description, `${prefix} ${command}`);
-
-  try {
-    return skip
-      ? null
-      : execSync(command, { cwd: process.cwd() }).toString().trim();
-  } catch (error) {
-    return null;
-  }
-};
-
-export const logInfo2 = (message: string, command?: string) => {
-  if (globals.dry || globals.verbose) {
-    console.log(message);
-
-    if (globals.verbose && command) {
-      console.log("↪", command);
-    }
-  }
-};
-
-export const error = (message: string, fatal: boolean = false, err?: any) => {
-  if (fatal || !globals.dry) {
-    console.error(`\u0007💥 ${chalk.red("Command aborted:")} ${message}\n`);
-    if (err) {
-      console.trace(err);
-    }
-    process.exit(1);
-  }
-
-  logError(message);
+  // TODO: Finished output
 };

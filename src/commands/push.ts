@@ -40,17 +40,22 @@ const retrieveReleaseData = () => {
 
 const retrieveAvailableReleases = () => {
   ensureReleasesPath();
-  const files = readdirSync(releasesPath)
-  return files.map(f => f.split('.')[0]);
-}
+  const files = readdirSync(releasesPath);
+  return files.map((f) => chalk.white(f.split(".")[0]));
+};
 
 export default wrapCommand(
   async (opts: Record<string, any>, _: InstanceType<typeof Command>) => {
     options = opts as typeof options;
 
     if (!options.id) {
-      console.log("The option '--id <value>' is required for this command");
-      // console.log(retrieveAvailableReleases());
+      console.log(
+        `The option ${chalk.white(`--id <value>`)} is required for this command`
+      );
+      console.log(
+        "The following releases are available on your system:",
+        retrieveAvailableReleases().join(", ")
+      );
       process.exit(1);
     }
 
