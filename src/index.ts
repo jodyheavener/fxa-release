@@ -2,32 +2,32 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { program, Option, Command } from "commander";
-import pckg from "../package.json";
-import { cut, push, status, guide } from "./commands";
-import { serviceInfo } from "./commands/status";
-import { gitDefaults } from "./constants";
-import { commaSeparatedList, createEnvVar } from "./utils";
+import { Command, Option, program } from 'commander';
+import pckg from '../package.json';
+import { cut, guide, push, status } from './commands';
+import { serviceInfo } from './commands/status';
+import { gitDefaults } from './constants';
+import { commaSeparatedList, createEnvVar } from './utils';
 
 program.version(pckg.version).description(pckg.description);
 
 const options = {
   verbose: new Option(
-    "--verbose",
-    "output detailed information for the current command"
+    '--verbose',
+    'output detailed information for the current command'
   ).default(false),
-  remote: new Option("-r, --remote <name>", "the name of the git remote to use")
+  remote: new Option('-r, --remote <name>', 'the name of the git remote to use')
     .default(gitDefaults.remote)
-    .env(createEnvVar("remote")),
+    .env(createEnvVar('remote')),
   defaultBranch: new Option(
-    "-b, --default-branch <name>",
-    "the name of the default git branch"
+    '-b, --default-branch <name>',
+    'the name of the default git branch'
   )
     .default(gitDefaults.branch)
-    .env(createEnvVar("default_branch")),
+    .env(createEnvVar('default_branch')),
   dryRun: new Option(
-    "-d, --dry",
-    "perform a dry run, where no changes are made"
+    '-d, --dry',
+    'perform a dry run, where no changes are made'
   ).default(false),
 };
 
@@ -52,29 +52,29 @@ const addCommand = (
 };
 
 addCommand(
-  "cut",
-  "Cut a new release",
+  'cut',
+  'Cut a new release',
   [
-    new Option("-t, --type <type>", "the Release build type")
-      .choices(["train", "patch"])
-      .default("train")
-      .env(createEnvVar("release_type")),
+    new Option('-t, --type <type>', 'the Release build type')
+      .choices(['train', 'patch'])
+      .default('train')
+      .env(createEnvVar('release_type')),
     options.remote,
     options.defaultBranch,
     options.dryRun,
     new Option(
-      "-f, --force",
-      "set the env var FXAR_REQUIRE_FORCE=1 to require this flag when cutting a new Release"
+      '-f, --force',
+      'set the env var FXAR_REQUIRE_FORCE=1 to require this flag when cutting a new Release'
     ).default(false),
   ],
   cut
 );
 
 addCommand(
-  "push",
-  "Push changes from a Release in progress",
+  'push',
+  'Push changes from a Release in progress',
   [
-    new Option("--id <value>", "the ID of the in-progress Release to push"),
+    new Option('--id <value>', 'the ID of the in-progress Release to push'),
     options.dryRun,
     options.remote,
     options.defaultBranch,
@@ -83,33 +83,33 @@ addCommand(
 );
 
 addCommand(
-  "status",
-  "Retrieve the statuses of FxA services",
+  'status',
+  'Retrieve the statuses of FxA services',
   [
     new Option(
-      "-e, --environment <name>",
-      "the environment to retrieve version data from"
+      '-e, --environment <name>',
+      'the environment to retrieve version data from'
     )
-      .choices(["production", "staging", "development"])
-      .default("production")
-      .env(createEnvVar("environment")),
+      .choices(['production', 'staging', 'development'])
+      .default('production')
+      .env(createEnvVar('environment')),
     new Option(
-      "-s, --services [name]",
-      "comma-separated list of Services to retrieve version data for (defaults to all)"
+      '-s, --services [name]',
+      'comma-separated list of Services to retrieve version data for (defaults to all)'
     )
       .choices(Object.keys(serviceInfo))
       .argParser(commaSeparatedList)
-      .env(createEnvVar("services_include")),
+      .env(createEnvVar('services_include')),
     new Option(
-      "-x, --exclude [name]",
-      "comma-separated list of Services to exclude from retrieval"
+      '-x, --exclude [name]',
+      'comma-separated list of Services to exclude from retrieval'
     )
       .argParser(commaSeparatedList)
-      .env(createEnvVar("services_exclude")),
+      .env(createEnvVar('services_exclude')),
   ],
   status
 );
 
-addCommand("guide", "Display helpful Release information", [], guide);
+addCommand('guide', 'Display helpful Release information', [], guide);
 
 program.parse();

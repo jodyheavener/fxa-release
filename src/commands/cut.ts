@@ -2,24 +2,23 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import chalk from "chalk";
-import { Command } from "commander";
+import chalk from 'chalk';
 import {
-  capitalize,
-  execute,
-  confirmPush,
+  assertAbsence,
   assertPresence,
-  wrapCommand,
+  capitalize,
+  confirmPush,
+  createEnvVar,
+  execute,
+  logDryMessage,
   logError,
   parseVersion,
-  logDryMessage,
-  createEnvVar,
   unpad,
-  assertAbsense,
-} from "../utils";
+  wrapCommand,
+} from '../utils';
 
 let options: {
-  type: "train" | "patch";
+  type: 'train' | 'patch';
   force: boolean;
   remote: string;
   defaultBranch: string;
@@ -39,7 +38,7 @@ const getTrainVersions = (tag: string) => {
     tag: `v${nextVersion}`,
   };
 
-  if (options.type === "patch") {
+  if (options.type === 'patch') {
     nextVersion = `${major}.${train}.${patch + 1}`;
     next.train = train;
     next.patch = patch + 1;
@@ -60,16 +59,16 @@ const getTrainVersions = (tag: string) => {
   };
 };
 
-const getTrainBranch = (type: "local" | "remote", train: number) => {
+const getTrainBranch = (type: 'local' | 'remote', train: number) => {
   const localName = `train-${train}`;
   const exists = (lookup: string, value: string) =>
-    lookup.replace(/\*| /g, "").split("\n").includes(value);
-  if (type === "local") {
+    lookup.replace(/\*| /g, '').split('\n').includes(value);
+  if (type === 'local') {
     return {
       name: localName,
       exists: exists(
         execute(
-          "git branch --no-color",
+          'git branch --no-color',
           `Inspecting local branches to see if ${localName} branch exists.`
         ),
         localName
@@ -81,7 +80,7 @@ const getTrainBranch = (type: "local" | "remote", train: number) => {
       name: remoteName,
       exists: exists(
         execute(
-          "git branch --no-color -r",
+          'git branch --no-color -r',
           `Inspecting remote branches to see if ${remoteName} branch exists.`
         ),
         remoteName
@@ -90,184 +89,180 @@ const getTrainBranch = (type: "local" | "remote", train: number) => {
   }
 };
 
-export default wrapCommand(
-  async (opts: Record<string, any>, _: InstanceType<typeof Command>) => {
-    options = opts as typeof options;
+export default wrapCommand(async (opts: Record<string, any>) => {
+  options = opts as typeof options;
 
-    if (process.env[createEnvVar("require_force")] && !options.force) {
-      console.log(
-        `The env var FXAR_REQUIRE_FORCE is set, requiring this command to be run with the ${chalk.white(
-          "--force"
-        )} flag`
-      );
-      process.exit(1);
-    }
-
+  if (process.env[createEnvVar('require_force')] && !options.force) {
     console.log(
-      chalk.white(
-        `Cutting a new ${chalk.blue(capitalize(options.type))} Release...`
-      )
+      `The env var FXAR_REQUIRE_FORCE is set, requiring this command to be run with the ${chalk.white(
+        '--force'
+      )} flag`
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    chalk.white(
+      `Cutting a new ${chalk.blue(capitalize(options.type))} Release...`
+    )
+  );
+
+  const currentBranch = execute(
+    'git rev-parse --abbrev-ref HEAD',
+    'Retrieving the current branch.'
+  );
+  let lastTag: string;
+
+  if (options.type === 'train') {
+    // When starting a train the last tag is the last recently created train tag.
+    lastTag = execute(
+      'git tag -l --sort=version:refname',
+      'The Release type is "train"; retrieving the last Train Tag.'
+    )
+      .split('\n')
+      .filter((t) => t.startsWith('v'))
+      .pop();
+  } else if (options.type === 'patch') {
+    // When we're on a train branch for a patch the current tag is last tag.
+    lastTag = execute(
+      'git describe --tags --first-parent --abbrev=0',
+      'The Release type is "patch"; retrieving the last Patch Tag in the current Release.'
     );
 
-    const currentBranch = execute(
-      "git rev-parse --abbrev-ref HEAD",
-      "Retrieving the current branch."
-    );
-    let lastTag: string;
-
-    if (options.type === "train") {
-      // When starting a train the last tag is the last recently created train tag.
-      lastTag = execute(
-        "git tag -l --sort=version:refname",
-        'The Release type is "train"; retrieving the last Train Tag.'
-      )
-        .split("\n")
-        .filter((t) => t.startsWith("v"))
-        .pop();
-    } else if (options.type === "patch") {
-      // When we're on a train branch for a patch the current tag is last tag.
-      lastTag = execute(
-        "git describe --tags --first-parent --abbrev=0",
-        'The Release type is "patch"; retrieving the last Patch Tag in the current Release.'
-      );
-
-      if (currentBranch === options.defaultBranch) {
-        logError(
-          `You are trying to release a Patch on the default ${options.defaultBranch} branch. Please switch to a Train branch.`,
-          true
-        );
-      }
-    }
-
-    if (!lastTag) {
+    if (currentBranch === options.defaultBranch) {
       logError(
-        `Could not determine the last Tag. Are you on the correct branch?.`,
+        `You are trying to release a Patch on the default ${options.defaultBranch} branch. Please switch to a Train branch.`
+      );
+    }
+  }
+
+  if (!lastTag) {
+    logError(
+      `Could not determine the last Tag. Are you on the correct branch?.`
+    );
+  }
+
+  // Generate the bumped version string.
+  const { current: currentVersion, next: nextVersion } =
+    getTrainVersions(lastTag);
+  const localTrainBranch = getTrainBranch('local', nextVersion.train);
+
+  try {
+    assertAbsence(
+      execute(
+        'git status --porcelain',
+        'Ensuring the current branch is clean.'
+      ),
+      `The current branch (${currentBranch}) is not clean. Please commit or stash your changes before releasing.`
+    );
+
+    assertPresence(
+      execute(
+        `git log ${lastTag}..HEAD --pretty=oneline --abbrev-commit`,
+        'Ensure there are new commits on the current branch since the last tagging.'
+      ),
+      `The current branch (${currentBranch}) has no new commits since the last release tag (${lastTag}).`
+    );
+  } catch (error) {
+    logError(error.message);
+  }
+
+  // If current branch is train branch, pull from remote.
+  if (currentBranch === localTrainBranch.name) {
+    execute(
+      `git pull ${options.remote} ${localTrainBranch.name}`,
+      `The current branch is the train branch; pulling latest from it.`,
+      true
+    );
+  }
+  // Otherwise checkout existing train branch or create a fresh one from the default branch.
+  else {
+    if (localTrainBranch.exists) {
+      logDryMessage(
+        "We are not on a train branch, but we found it locally so we'll switch to it and attempt to pull in the latest changes from the remote."
+      );
+      execute(
+        `git checkout ${localTrainBranch.name}`,
+        `Checking out the ${localTrainBranch.name} branch.`,
         true
       );
-    }
-
-    // Generate the bumped version string.
-    const { current: currentVersion, next: nextVersion } =
-      getTrainVersions(lastTag);
-    const localTrainBranch = getTrainBranch("local", nextVersion.train);
-
-    try {
-      assertAbsense(
-        execute(
-          "git status --porcelain",
-          "Ensuring the current branch is clean."
-        ),
-        `The current branch (${currentBranch}) is not clean. Please commit or stash your changes before releasing.`
-      );
-
-      assertPresence(
-        execute(
-          `git log ${lastTag}..HEAD --pretty=oneline --abbrev-commit`,
-          "Ensure there are new commits on the current branch since the last tagging."
-        ),
-        `The current branch (${currentBranch}) has no new commits since the last release tag (${lastTag}).`
-      );
-    } catch (error) {
-      logError(error.message, true);
-    }
-
-    // If current branch is train branch, pull from remote.
-    if (currentBranch === localTrainBranch.name) {
       execute(
         `git pull ${options.remote} ${localTrainBranch.name}`,
-        `The current branch is the train branch; pulling latest from it.`,
+        `Pulling the latest ${localTrainBranch.name} branch changes from ${options.remote} remote.`,
         true
       );
-    }
-    // Otherwise checkout existing train branch or create a fresh one from the default branch.
-    else {
-      if (localTrainBranch.exists) {
-        logDryMessage(
-          "We are not on a train branch, but we found it locally so we'll switch to it and attempt to pull in the latest changes from the remote."
-        );
+    } else {
+      logDryMessage(
+        "We're not on a train branch; checking to see if one exists on the remote."
+      );
+      execute(
+        `git fetch ${options.remote} ${localTrainBranch.name} > /dev/null 2>&1`,
+        `Attempting to fetch the ${localTrainBranch.name} branch from ${options.remote} remote.`
+      );
+
+      const remoteTrainBranch = getTrainBranch('remote', nextVersion.train);
+      if (remoteTrainBranch.exists) {
         execute(
-          `git checkout ${localTrainBranch.name}`,
-          `Checking out the ${localTrainBranch.name} branch.`,
-          true
-        );
-        execute(
-          `git pull ${options.remote} ${localTrainBranch.name}`,
-          `Pulling the latest ${localTrainBranch.name} branch changes from ${options.remote} remote.`,
+          `git checkout --track -b ${localTrainBranch.name} ${remoteTrainBranch.name}`,
+          `Remote train branch found; checking it out and attaching it to the remote.`,
           true
         );
       } else {
         logDryMessage(
-          "We're not on a train branch; checking to see if one exists on the remote."
+          `${localTrainBranch.name} branch not found on local or remote; creating one from ${options.defaultBranch} branch.`
         );
         execute(
-          `git fetch ${options.remote} ${localTrainBranch.name} > /dev/null 2>&1`,
-          `Attempting to fetch the ${localTrainBranch.name} branch from ${options.remote} remote.`
+          `git checkout ${options.defaultBranch} > /dev/null 2>&1`,
+          `Checking out the ${options.defaultBranch} branch.`,
+          true
         );
-
-        const remoteTrainBranch = getTrainBranch("remote", nextVersion.train);
-        if (remoteTrainBranch.exists) {
-          execute(
-            `git checkout --track -b ${localTrainBranch.name} ${remoteTrainBranch.name}`,
-            `Remote train branch found; checking it out and attaching it to the remote.`,
-            true
-          );
-        } else {
-          logDryMessage(
-            `${localTrainBranch.name} branch not found on local or remote; creating one from ${options.defaultBranch} branch.`
-          );
-          execute(
-            `git checkout ${options.defaultBranch} > /dev/null 2>&1`,
-            `Checking out the ${options.defaultBranch} branch.`,
-            true
-          );
-          execute(
-            `git pull ${options.remote} ${options.defaultBranch}`,
-            `Pulling the latest ${options.defaultBranch} branch changes from ${options.remote} remote.`,
-            true
-          );
-          execute(
-            `git checkout -b ${localTrainBranch.name}`,
-            `Creating new ${localTrainBranch.name} branch off ${options.defaultBranch} branch.`,
-            true
-          );
-        }
+        execute(
+          `git pull ${options.remote} ${options.defaultBranch}`,
+          `Pulling the latest ${options.defaultBranch} branch changes from ${options.remote} remote.`,
+          true
+        );
+        execute(
+          `git checkout -b ${localTrainBranch.name}`,
+          `Creating new ${localTrainBranch.name} branch off ${options.defaultBranch} branch.`,
+          true
+        );
       }
     }
+  }
 
-    // TODO: define targets, bump each
+  // TODO: define targets, bump each
 
-    execute("npm run authors", "Updating the authors file.", true);
-    execute(
-      `git commit -a -m "Release ${nextVersion.version}"`,
-      "Committing release changelog and version bump changes.",
-      true
-    );
-    execute(
-      `git tag -a "${nextVersion.tag}" -m "${capitalize(
-        options.type
-      )} release ${nextVersion.version}"`,
-      `Tagging the code as ${nextVersion.tag}.`,
-      true
-    );
+  execute('npm run authors', 'Updating the authors file.', true);
+  execute(
+    `git commit -a -m "Release ${nextVersion.version}"`,
+    'Committing release changelog and version bump changes.',
+    true
+  );
+  execute(
+    `git tag -a "${nextVersion.tag}" -m "${capitalize(options.type)} release ${
+      nextVersion.version
+    }"`,
+    `Tagging the code as ${nextVersion.tag}.`,
+    true
+  );
 
-    // TODO: if deploy script file available, inspect it and replace train number with current train number
+  // TODO: if deploy script file available, inspect it and replace train number with current train number
 
-    if (!options.dry) {
-      console.log(
-        unpad(
-          `\n${chalk.green(
-            "Tagged!"
-          )} A Release commit has been created, and everything has been Tagged locally, but it hasn't been pushed. Before proceeding you should check that the changes appear to be sane. At the very least you should eyeball the diffs and git log, and if you're feeling particularly vigilant you may want to run some of the tests and linters too.`
-        )
-      );
-    }
-
-    await confirmPush(
-      {
-        branch: localTrainBranch.name,
-        tag: nextVersion.tag,
-      },
-      true
+  if (!options.dry) {
+    console.log(
+      unpad(
+        `\n${chalk.green(
+          'Tagged!'
+        )} A Release commit has been created, and everything has been Tagged locally, but it hasn't been pushed. Before proceeding you should check that the changes appear to be sane. At the very least you should eyeball the diffs and git log, and if you're feeling particularly vigilant you may want to run some of the tests and linters too.`
+      )
     );
   }
-);
+
+  await confirmPush(
+    {
+      branch: localTrainBranch.name,
+      tag: nextVersion.tag,
+    },
+    true
+  );
+});
