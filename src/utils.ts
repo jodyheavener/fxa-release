@@ -177,7 +177,7 @@ export const wrapCommand =
     try {
       await fn(opts, program);
     } catch (err) {
-      logError('The command failed in a big way', err);
+      logError('The command encountered an error and needed to abort', err);
     }
 
     completeCommand();
@@ -207,8 +207,8 @@ const completeCommand = () => {
     if (getValue('hasErrors')) {
       console.log(
         `\n${chalk.red(
-          'This command would have failed'
-        )}. Please correct the errors above and try again.`
+          'This command would not have completed successfully.'
+        )} Please correct the errors above and try again before removing the --dry flag.`
       );
     } else {
       console.log(
@@ -369,23 +369,99 @@ export const confirmPush = async (
   );
 };
 
-export const createPackagePath = (directory: string) => {
-  const packagePath = join(process.cwd(), 'packages', directory);
-  if (!existsSync(packagePath)) {
-    throw new Error(`Could not find package directory: ${packagePath}`);
+export const commitTypes = {
+  feat: 'New features',
+  fix: 'Bug fixes',
+  perf: 'Performance improvements',
+  refactor: 'Code refactoring',
+  revert: 'Reverted changes',
+  other: 'Other changes',
+};
+
+export const ignoredCommitTypes = ['Merge', 'Release'];
+
+export type PackageCommit = {
+  original: string;
+  hash: string;
+  message: string;
+  type: keyof typeof commitTypes;
+  area?: string;
+};
+
+export const parseCommits = (input: string): PackageCommit[] => {
+  let commits = [];
+
+  if (input.trim().length) {
+    commits = input
+      .split('\n')
+      .map((original: string) => {
+        const [hash, rest] = original.split(/ (.+)/);
+        const parts = rest.match(/^(.+)\((.+)\):(.+)$/);
+        const commit = {
+          original,
+          hash,
+        };
+
+        if (parts) {
+          const type = parts[1];
+
+          if (ignoredCommitTypes.includes(type)) {
+            return null;
+          }
+
+          Object.assign(commit, {
+            message: parts[3].trim(),
+            type: parts[1],
+            area: parts[2],
+          });
+        } else {
+          Object.assign(commit, {
+            type: 'other',
+            message: rest,
+          });
+        }
+
+        return commit as PackageCommit;
+      })
+      .filter((c) => c != null);
   }
+
+  return commits;
+};
+
+export const createPackagePath = (directory: string) => {
+  const packagesPath = join(process.cwd(), 'packages');
+
+  if (!existsSync(packagesPath)) {
+    throw new Error(`Could not find packages directory: ${packagesPath}`);
+  }
+
+  const packagePath = join(packagesPath, directory);
+  if (!existsSync(packagePath)) {
+    logWarning(`Could not find package directory for ${directory}`);
+    return null;
+  }
+
   return packagePath;
 };
 
 const versionedFiles = ['package.json', 'Cargo.toml', 'Cargo.lock'];
 
-export const bumpVersions = (directory: string) => {
-  const packagePath = createPackagePath(directory);
+export const bumpVersions = (
+  packagePath: string,
+  current: string,
+  next: string
+) => {
+  if (!packagePath || getValue('dry')) {
+    return;
+  }
 
   for (const file of versionedFiles) {
     const filePath = join(packagePath, file);
     if (existsSync(filePath)) {
-      console.log('versioning', filePath);
+      let content = readFileSync(filePath, 'utf8');
+      content = content.replace(current, next);
+      writeFileSync(filePath, content, 'utf8');
     }
   }
 };

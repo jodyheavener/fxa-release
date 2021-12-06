@@ -4,17 +4,22 @@
 
 import chalk from 'chalk';
 import { existsSync, readFileSync } from 'fs';
-import { deployBugFile, packages } from '../constants';
+import { join } from 'path';
+import prependFile from 'prepend-file';
+import { deployBugFile, packages, repoUrl } from '../constants';
 import {
   assertAbsence,
   assertPresence,
   bumpVersions,
   capitalize,
+  commitTypes,
   confirmPush,
   createEnvVar,
+  createPackagePath,
   execute,
   logDryMessage,
   logError,
+  parseCommits,
   parseVersion,
   unpad,
   wrapCommand,
@@ -29,9 +34,19 @@ type Options = {
   verbose: boolean;
 };
 
+type ReleaseVersion = {
+  major: number;
+  train: number;
+  patch: number;
+  version: string;
+  tag: string;
+};
+
 let options: Options;
 
-const getTrainVersions = (tag: string) => {
+const getTrainVersions = (
+  tag: string
+): { current: ReleaseVersion; next: ReleaseVersion } => {
   const { major, train, patch } = parseVersion(tag);
 
   let nextVersion = `${major}.${train + 1}.0`;
@@ -101,8 +116,56 @@ const retrieveDeployBugURL = () => {
   return null;
 };
 
-const bump = (directory: string, tag: string) => {
-  bumpVersions(directory);
+const bump = (
+  directory: string,
+  currentVersion: ReleaseVersion,
+  nextVersion: ReleaseVersion
+) => {
+  const packagePath = createPackagePath(directory);
+
+  const commits = parseCommits(
+    execute(
+      `git log ${currentVersion.tag}..HEAD --no-color --pretty=oneline --abbrev-commit -- "packages/${directory}"`,
+      `Retrieving commits since ${currentVersion.tag} for ${directory}`
+    )
+  );
+
+  const summaries: Partial<Record<keyof typeof commitTypes, string>> = {};
+
+  Object.entries(commitTypes).forEach(([type, title]) => {
+    const typeCommits = commits.filter((commit) => commit.type === type);
+    if (typeCommits.length) {
+      const items = typeCommits
+        .map(
+          (commit) =>
+            `\n- ${commit.area ? `${commit.area}: ` : ''}${commit.message} ([${
+              commit.hash
+            }](${repoUrl}/commit/${commit.hash}))`
+        )
+        .join();
+      summaries[type] = `### ${title}\n${items}`;
+    }
+  });
+
+  const hasChanges = Object.values(summaries).length !== 0;
+  let message = 'No changes.';
+  if (hasChanges) {
+    message = Object.values(summaries).join('\n\n');
+  }
+
+  if (packagePath && !options.dry) {
+    const changelogPath = join(packagePath, 'CHANGELOG.md');
+    if (existsSync(changelogPath)) {
+      prependFile.sync(
+        changelogPath,
+        `## ${nextVersion.version}\n\n${message}\n\n`
+      );
+    }
+  }
+
+  bumpVersions(packagePath, currentVersion.version, nextVersion.version);
+
+  return hasChanges ? directory : null;
 };
 
 export default wrapCommand(async (opts: Record<string, any>) => {
@@ -246,11 +309,16 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     }
   }
 
-  Object.values(packages).forEach((directory) =>
-    bump(directory, nextVersion.tag)
-  );
+  logDryMessage('Bumping versions and generating changelogs for each package.');
+  const pertinantPackages = Object.values(packages)
+    .map((directory) => bump(directory, currentVersion, nextVersion))
+    .filter((c) => c != null);
 
-  execute('npm run authors', 'Updating the authors file.', true);
+  execute(
+    'git shortlog -s | cut -c8- | sort -f > AUTHORS',
+    'Updating the authors file.',
+    true
+  );
   execute(
     `git commit -a -m "Release ${nextVersion.version}"`,
     'Committing release changelog and version bump changes.',
