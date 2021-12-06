@@ -10,12 +10,13 @@ import { prompt } from 'inquirer';
 import logUpdate from 'log-update';
 import { join } from 'path';
 import terminalLink from 'terminal-link';
-import { envVarPrefix, gitDefaults, releasesPath } from './constants';
+import { envVarPrefix, gitDefaults, releasesPath, repoUrl } from './constants';
 
 // Global values
 
 const globals = {
   remote: gitDefaults.remote,
+  defaultBranch: gitDefaults.branch,
   dry: false,
   verbose: false,
   hasErrors: false,
@@ -333,7 +334,7 @@ export const confirmPush = async (
     return console.log(
       `${chalk.yellow(
         '\nYour changes have not been pushed.'
-      )} When you are ready to push you can run the following:\n${chalk.white(
+      )} When you are ready to push you can run the following:\n\n${chalk.white(
         `fxa-release push --id ${id}`
       )}`
     );
@@ -345,5 +346,13 @@ export const confirmPush = async (
     true
   );
 
-  // TODO: Finished output
+  console.log(
+    `${chalk.green(
+      '\nRelease pushed successfully!'
+    )} Now you you must open pull a request to merge the changes back to ${getValue(
+      'defaultBranch'
+    )}:\n\n➤ ${visibleLink(
+      `${repoUrl}/compare/${branch}?expand=1`
+    )}\n\nAsk for review on the pull request from ${chalk.white('@fxa-devs')}.`
+  );
 };
