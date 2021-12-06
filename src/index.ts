@@ -5,8 +5,7 @@
 import { Command, Option, program } from 'commander';
 import pckg from '../package.json';
 import { cut, guide, push, status } from './commands';
-import { serviceInfo } from './commands/status';
-import { gitDefaults } from './constants';
+import { gitDefaults, serviceSets } from './constants';
 import { commaSeparatedList, createEnvVar } from './utils';
 
 program.version(pckg.version).description(pckg.description);
@@ -97,7 +96,7 @@ addCommand(
       '-s, --services [name]',
       'comma-separated list of Services to retrieve version data for (defaults to all)'
     )
-      .choices(Object.keys(serviceInfo))
+      .choices(Object.keys(serviceSets))
       .argParser(commaSeparatedList)
       .env(createEnvVar('services_include')),
     new Option(

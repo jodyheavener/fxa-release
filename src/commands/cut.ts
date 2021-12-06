@@ -4,10 +4,11 @@
 
 import chalk from 'chalk';
 import { existsSync, readFileSync } from 'fs';
-import { deployBugFile } from '../constants';
+import { deployBugFile, packages } from '../constants';
 import {
   assertAbsence,
   assertPresence,
+  bumpVersions,
   capitalize,
   confirmPush,
   createEnvVar,
@@ -19,7 +20,7 @@ import {
   wrapCommand,
 } from '../utils';
 
-let options: {
+type Options = {
   type: 'train' | 'patch';
   force: boolean;
   remote: string;
@@ -27,6 +28,8 @@ let options: {
   dry: boolean;
   verbose: boolean;
 };
+
+let options: Options;
 
 const getTrainVersions = (tag: string) => {
   const { major, train, patch } = parseVersion(tag);
@@ -98,8 +101,12 @@ const retrieveDeployBugURL = () => {
   return null;
 };
 
+const bump = (directory: string, tag: string) => {
+  bumpVersions(directory);
+};
+
 export default wrapCommand(async (opts: Record<string, any>) => {
-  options = opts as typeof options;
+  options = opts as Options;
 
   if (process.env[createEnvVar('require_force')] && !options.force) {
     console.log(
@@ -239,7 +246,9 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     }
   }
 
-  // TODO: define targets, bump each
+  Object.values(packages).forEach((directory) =>
+    bump(directory, nextVersion.tag)
+  );
 
   execute('npm run authors', 'Updating the authors file.', true);
   execute(

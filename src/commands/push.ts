@@ -16,12 +16,14 @@ import {
   wrapCommand,
 } from '../utils';
 
-let options: {
+type Options = {
   id: string;
   remote: string;
   defaultBranch: string;
   verbose: boolean;
 };
+
+let options: Options;
 
 const retrieveReleaseData = () => {
   const path = createReleaseFilePath(options.id);
@@ -44,7 +46,7 @@ const retrieveAvailableReleases = () => {
 };
 
 export default wrapCommand(async (opts: Record<string, any>) => {
-  options = opts as typeof options;
+  options = opts as Options;
 
   if (!options.id) {
     console.log(

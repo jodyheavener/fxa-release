@@ -5,7 +5,13 @@
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { Command } from 'commander';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
 import { prompt } from 'inquirer';
 import logUpdate from 'log-update';
 import { join } from 'path';
@@ -287,6 +293,7 @@ export const confirmPush = async (
   save: boolean,
   id?: string
 ) => {
+  const fromSavedRelease = id != null;
   const remote = getValue('remote');
   const command = `git push ${remote} ${branch}:${branch} && git push ${remote} ${tag}`;
 
@@ -312,7 +319,8 @@ export const confirmPush = async (
   const { confirm } = (await prompt({
     type: 'input',
     name: 'confirm',
-    message: "Type 'push' to confirm. Any other response will abort.",
+    message:
+      "Type 'push' to confirm. Any other response will abort and save your Release for later.",
   })) as { confirm: string };
 
   if (confirm !== 'push') {
@@ -346,6 +354,10 @@ export const confirmPush = async (
     true
   );
 
+  if (fromSavedRelease) {
+    unlinkSync(createReleaseFilePath(id));
+  }
+
   console.log(
     `${chalk.green(
       '\nRelease pushed successfully!'
@@ -355,4 +367,25 @@ export const confirmPush = async (
       `${repoUrl}/compare/${branch}?expand=1`
     )}\n\nAsk for review on the pull request from ${chalk.white('@fxa-devs')}.`
   );
+};
+
+export const createPackagePath = (directory: string) => {
+  const packagePath = join(process.cwd(), 'packages', directory);
+  if (!existsSync(packagePath)) {
+    throw new Error(`Could not find package directory: ${packagePath}`);
+  }
+  return packagePath;
+};
+
+const versionedFiles = ['package.json', 'Cargo.toml', 'Cargo.lock'];
+
+export const bumpVersions = (directory: string) => {
+  const packagePath = createPackagePath(directory);
+
+  for (const file of versionedFiles) {
+    const filePath = join(packagePath, file);
+    if (existsSync(filePath)) {
+      console.log('versioning', filePath);
+    }
+  }
 };
