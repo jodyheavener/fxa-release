@@ -14,3 +14,9 @@ export const repoUrl = 'https://github.com/mozilla/fxa';
 export const envVarPrefix = 'FXAR';
 
 export const releasesPath = join(__dirname, 'releases');
+
+export const deployBugFile = join(
+  process.cwd(),
+  '_scripts',
+  'create-deploy-bug.url'
+);

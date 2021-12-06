@@ -3,6 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import chalk from 'chalk';
+import { existsSync, readFileSync } from 'fs';
+import { deployBugFile } from '../constants';
 import {
   assertAbsence,
   assertPresence,
@@ -87,6 +89,13 @@ const getTrainBranch = (type: 'local' | 'remote', train: number) => {
       ),
     };
   }
+};
+
+const retrieveDeployBugURL = () => {
+  if (existsSync(deployBugFile)) {
+    return readFileSync(deployBugFile, 'utf8').trim();
+  }
+  return null;
 };
 
 export default wrapCommand(async (opts: Record<string, any>) => {
@@ -246,16 +255,22 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     true
   );
 
-  // TODO: if deploy script file available, inspect it and replace train number with current train number
+  let deployBugUrl = retrieveDeployBugURL();
+  if (deployBugUrl) {
+    deployBugUrl = deployBugUrl.replace('TRAIN_NUMBER', localTrainBranch.name);
+  }
 
   if (!options.dry) {
     console.log(
-      unpad(
+      `\n${unpad(
         `\n${chalk.green(
           'Tagged!'
         )} A Release commit has been created, and everything has been Tagged locally, but it hasn't been pushed. Before proceeding you should check that the changes appear to be sane. At the very least you should eyeball the diffs and git log, and if you're feeling particularly vigilant you may want to run some of the tests and linters too.`
-      )
+      )}\n`
     );
+
+    console.log(`- Branch: ${chalk.white(localTrainBranch.name)}`);
+    console.log(`- Tag: ${chalk.white(nextVersion.tag)}`);
   }
 
   await confirmPush(
