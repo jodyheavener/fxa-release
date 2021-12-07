@@ -74,17 +74,17 @@ export default wrapCommand(async (opts: Record<string, any>) => {
 
   try {
     const response = retrieveReleaseData() as ReleaseData;
-    const { train, type, branch, tag, modifiedPackages } = response;
+    const { train, patch, type, branch, tag, modifiedPackages } = response;
 
     if (options.verbose) {
       console.log(response);
     }
 
     assertPresence(
-      [train, type, branch, tag],
+      [train, patch, type, branch, tag],
       'Required data not found in saved Release file'
     );
-    data = { train, type, branch, tag, modifiedPackages };
+    data = { train, patch, type, branch, tag, modifiedPackages };
   } catch (err) {
     logError('There was a problem fetching the Release data', err);
   } finally {

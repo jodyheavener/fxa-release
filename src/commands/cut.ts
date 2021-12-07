@@ -339,6 +339,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   await confirmPush(
     {
       train: String(nextVersion.train),
+      patch: String(nextVersion.patch),
       type: options.type,
       branch: localTrainBranch.name,
       tag: nextVersion.tag,

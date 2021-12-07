@@ -310,12 +310,13 @@ export type ReleaseData = {
   type: ReleaseType;
   branch: string;
   train: string;
+  patch: string;
   tag: string;
   modifiedPackages: string[];
 };
 
 export const confirmPush = async (
-  { train, type, branch, tag, modifiedPackages }: ReleaseData,
+  { train, patch, type, branch, tag, modifiedPackages }: ReleaseData,
   save: boolean,
   id?: string
 ) => {
@@ -344,6 +345,7 @@ export const confirmPush = async (
       JSON.stringify(
         {
           train,
+          patch,
           type,
           branch,
           tag,
@@ -392,13 +394,19 @@ export const confirmPush = async (
 
   unlinkSync(createReleaseFilePath(id));
 
+  const taggingUrl = `${repoUrl}/releases/tag/${tag}`;
+
   console.log(
     `${chalk.green(
       '\nRelease pushed successfully!'
     )} Now you you must open pull a request to merge the changes back to ${getValue(
       'defaultBranch'
     )}:\n\n➤ ${visibleLink(
-      `${repoUrl}/compare/${branch}?expand=1`
+      `${repoUrl}/compare/${branch}?expand=1&title=${encodeURIComponent(
+        `Release ${train}.${patch}`
+      )}&body=${encodeURIComponent(
+        `Train ${train}.${patch} has been [tagged](${taggingUrl}).`
+      )}`
     )}\n\nAsk for review on the pull request from ${chalk.white(
       '@fxa-devs'
     )}.\n`
