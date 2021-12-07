@@ -51,12 +51,21 @@ export default wrapCommand(async (opts: Record<string, any>) => {
 
   if (!options.id) {
     console.log(
-      `The option ${chalk.white(`--id <value>`)} is required for this command`
+      `The option ${chalk.white(`--id <value>`)} is required for this command.`
     );
-    console.log(
-      'The following releases are available on your system:',
-      retrieveAvailableReleases().join(', ')
-    );
+    const availableReleases = retrieveAvailableReleases();
+    if (availableReleases.length > 0) {
+      console.log(
+        'The following Releases are available on your system:',
+        availableReleases.join(', ')
+      );
+    } else {
+      console.log(
+        `You have no saved Releases. Cut a new one with:\n\n${chalk.white(
+          'fxa-release cut'
+        )}`
+      );
+    }
     process.exit(1);
   }
 

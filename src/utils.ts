@@ -171,6 +171,8 @@ export const wrapCommand =
       }
     }
 
+    // TODO - delete old Releases
+
     if (getValue('dry')) {
       console.log(
         chalk.white('⚠  Dry run enabled. Critical commands will be skipped.\n')
