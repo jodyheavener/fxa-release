@@ -3,13 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import chalk from 'chalk';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-import prependFile from 'prepend-file';
-import { deployBugFile, packages, repoUrl } from '../constants';
+import { packages, repoUrl } from '../constants';
 import {
   assertAbsence,
   assertPresence,
+  bumpChangelog,
   bumpVersions,
   capitalize,
   commitTypes,
@@ -21,12 +19,13 @@ import {
   logError,
   parseCommits,
   parseVersion,
+  ReleaseType,
   unpad,
   wrapCommand,
 } from '../utils';
 
 type Options = {
-  type: 'train' | 'patch';
+  type: ReleaseType;
   force: boolean;
   remote: string;
   defaultBranch: string;
@@ -109,13 +108,6 @@ const getTrainBranch = (type: 'local' | 'remote', train: number) => {
   }
 };
 
-const retrieveDeployBugURL = () => {
-  if (existsSync(deployBugFile)) {
-    return readFileSync(deployBugFile, 'utf8').trim();
-  }
-  return null;
-};
-
 const bump = (
   directory: string,
   currentVersion: ReleaseVersion,
@@ -142,28 +134,26 @@ const bump = (
               commit.hash
             }](${repoUrl}/commit/${commit.hash}))`
         )
-        .join();
+        .join('');
       summaries[type] = `### ${title}\n${items}`;
     }
   });
 
-  const hasChanges = Object.values(summaries).length !== 0;
+  const hasChanges = Object.values(summaries).length > 0;
   let message = 'No changes.';
   if (hasChanges) {
     message = Object.values(summaries).join('\n\n');
   }
 
-  if (packagePath && !options.dry) {
-    const changelogPath = join(packagePath, 'CHANGELOG.md');
-    if (existsSync(changelogPath)) {
-      prependFile.sync(
-        changelogPath,
-        `## ${nextVersion.version}\n\n${message}\n\n`
-      );
-    }
+  if (packagePath) {
+    bumpChangelog(
+      packagePath,
+      currentVersion.version,
+      nextVersion.version,
+      message
+    );
+    bumpVersions(packagePath, currentVersion.version, nextVersion.version);
   }
-
-  bumpVersions(packagePath, currentVersion.version, nextVersion.version);
 
   return hasChanges ? directory : null;
 };
@@ -310,15 +300,16 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   }
 
   logDryMessage('Bumping versions and generating changelogs for each package.');
-  const pertinantPackages = Object.values(packages)
+  const modifiedPackages = Object.values(packages)
     .map((directory) => bump(directory, currentVersion, nextVersion))
     .filter((c) => c != null);
 
-  execute(
-    'git shortlog -s | cut -c8- | sort -f > AUTHORS',
-    'Updating the authors file.',
-    true
-  );
+  // FIXME
+  // execute(
+  //   'git shortlog -s | cut -c8- | sort -f > AUTHORS',
+  //   'Updating the authors file.',
+  //   true
+  // );
   execute(
     `git commit -a -m "Release ${nextVersion.version}"`,
     'Committing release changelog and version bump changes.',
@@ -331,11 +322,6 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     `Tagging the code as ${nextVersion.tag}.`,
     true
   );
-
-  let deployBugUrl = retrieveDeployBugURL();
-  if (deployBugUrl) {
-    deployBugUrl = deployBugUrl.replace('TRAIN_NUMBER', localTrainBranch.name);
-  }
 
   if (!options.dry) {
     console.log(
@@ -352,8 +338,11 @@ export default wrapCommand(async (opts: Record<string, any>) => {
 
   await confirmPush(
     {
+      train: String(nextVersion.train),
+      type: options.type,
       branch: localTrainBranch.name,
       tag: nextVersion.tag,
+      modifiedPackages,
     },
     true
   );

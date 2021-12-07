@@ -10,16 +10,25 @@ export const gitDefaults = {
 };
 
 export const repoUrl = 'https://github.com/mozilla/fxa';
+export const privateRepoUrl = 'https://github.com/mozilla/fxa-private';
 
 export const envVarPrefix = 'FXAR';
 
 export const releasesPath = join(__dirname, 'releases');
 
-export const deployBugFile = join(
-  process.cwd(),
-  '_scripts',
-  'create-deploy-bug.url'
-);
+export const deployBug = {
+  file: join(process.cwd(), '_scripts', 'create-deploy-bug.url'),
+  url: `${privateRepoUrl}/_scripts/create-deploy-bug.url`,
+};
+
+export const qaIssuesUrlBase = {
+  fxa: 'https://github.com/mozilla/fxa/issues?q=is%3Aissue+is%3Aclosed+label%3Aneeds%3Aqa+updated%3A%3E',
+  subplat:
+    'https://github.com/mozilla/fxa/issues?q=is%3Aissue+is%3Aclosed+label%3Aqa%2B+updated%3A%3E',
+};
+
+export const deployDocUrl =
+  'https://docs.google.com/document/d/1lc5T1ZvQZlhXY6j1l_VMeQT9rs1mN7yYIcHbRPR2IbQ';
 
 export type ServiceSet = {
   restricted?: boolean;

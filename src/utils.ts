@@ -15,8 +15,17 @@ import {
 import { prompt } from 'inquirer';
 import logUpdate from 'log-update';
 import { join } from 'path';
+import prependFile from 'prepend-file';
 import terminalLink from 'terminal-link';
-import { envVarPrefix, gitDefaults, releasesPath, repoUrl } from './constants';
+import {
+  deployBug,
+  deployDocUrl,
+  envVarPrefix,
+  gitDefaults,
+  qaIssuesUrlBase,
+  releasesPath,
+  repoUrl,
+} from './constants';
 
 // Global values
 
@@ -68,8 +77,6 @@ export const assert = (condition: boolean, message: string) => {
   }
 };
 
-export function assertPresence(values: string, message: string): void;
-export function assertPresence(values: string[], message: string): void;
 export function assertPresence(
   values: string | string[],
   message: string
@@ -83,8 +90,6 @@ export function assertPresence(
   );
 }
 
-export function assertAbsence(values: string, message: string): void;
-export function assertAbsence(values: string[], message: string): void;
 export function assertAbsence(
   values: string | string[],
   message: string
@@ -283,17 +288,35 @@ export const execute = (
   }
 };
 
+const retrieveDeployBugURL = () => {
+  if (existsSync(deployBug.file)) {
+    return readFileSync(deployBug.file, 'utf8').trim();
+  }
+  return null;
+};
+
+const createQaIssuesUrl = (area: 'fxa' | 'subplat') => {
+  const twoWeeksAgo = new Date(new Date().getTime() - 12096e5);
+  return (
+    qaIssuesUrlBase[area] + encodeURIComponent(twoWeeksAgo.toLocaleDateString())
+  );
+};
+
+export type ReleaseType = 'train' | 'patch';
+
 export type ReleaseData = {
+  type: ReleaseType;
   branch: string;
+  train: string;
   tag: string;
+  modifiedPackages: string[];
 };
 
 export const confirmPush = async (
-  { branch, tag }: ReleaseData,
+  { train, type, branch, tag, modifiedPackages }: ReleaseData,
   save: boolean,
   id?: string
 ) => {
-  const fromSavedRelease = id != null;
   const remote = getValue('remote');
   const command = `git push ${remote} ${branch}:${branch} && git push ${remote} ${tag}`;
 
@@ -307,6 +330,29 @@ export const confirmPush = async (
     return;
   }
 
+  let deployBugUrl = retrieveDeployBugURL();
+  if (deployBugUrl) {
+    deployBugUrl = deployBugUrl.replace('TRAIN_NUMBER', train);
+  }
+
+  if (save) {
+    id = new Date().getTime().toString();
+    writeFileSync(
+      createReleaseFilePath(id),
+      JSON.stringify(
+        {
+          train,
+          type,
+          branch,
+          tag,
+          modifiedPackages,
+        },
+        null,
+        2
+      )
+    );
+  }
+
   console.log(
     `\n${chalk.yellow(
       'Important:'
@@ -314,7 +360,9 @@ export const confirmPush = async (
       branch
     )} and the tag ${chalk.white(tag)} to remote ${chalk.white(
       remote
-    )}. This may trigger CI jobs.`
+    )}. This may trigger CI jobs. If you would like to manually push changes at a later time, run the following when you are ready:\n\n${chalk.white(
+      `fxa-release push --id ${id}`
+    )}\n`
   );
   const { confirm } = (await prompt({
     type: 'input',
@@ -324,27 +372,13 @@ export const confirmPush = async (
   })) as { confirm: string };
 
   if (confirm !== 'push') {
-    if (save) {
-      id = new Date().getTime().toString();
-      writeFileSync(
-        createReleaseFilePath(id),
-        JSON.stringify(
-          {
-            branch,
-            tag,
-          },
-          null,
-          2
-        )
-      );
-    }
-
+    // Store the release for 2 weeks
     return console.log(
       `${chalk.yellow(
         '\nYour changes have not been pushed.'
-      )} When you are ready to push you can run the following:\n\n${chalk.white(
-        `fxa-release push --id ${id}`
-      )}`
+      )} Your stored Release will be saved until ${chalk.white(
+        new Date(+id + 12096e5).toLocaleString()
+      )}.`
     );
   }
 
@@ -354,9 +388,7 @@ export const confirmPush = async (
     true
   );
 
-  if (fromSavedRelease) {
-    unlinkSync(createReleaseFilePath(id));
-  }
+  unlinkSync(createReleaseFilePath(id));
 
   console.log(
     `${chalk.green(
@@ -365,16 +397,65 @@ export const confirmPush = async (
       'defaultBranch'
     )}:\n\n➤ ${visibleLink(
       `${repoUrl}/compare/${branch}?expand=1`
-    )}\n\nAsk for review on the pull request from ${chalk.white('@fxa-devs')}.`
+    )}\n\nAsk for review on the pull request from ${chalk.white(
+      '@fxa-devs'
+    )}.\n`
   );
+
+  const deployDocContent = [
+    `## ${tag} is [tagged](${repoUrl}/releases/tag/${tag})`,
+  ];
+
+  if (type === 'train') {
+    const deployRequestUrl = deployBugUrl
+      ? `Here's the URL to create one in Bugzilla: ${visibleLink(deployBugUrl)}`
+      : `Open this file and use its URL to create one in Bugzilla (be sure to update the title for Train ${train} before opening): ${visibleLink(
+          deployBug.url
+        )}`;
+
+    console.log(
+      `If there's no deploy bug for Train ${train} yet, you should create one. ${deployRequestUrl}\n`
+    );
+    console.log(
+      `Copy any notes for Train ${train} from the deploy doc: ${visibleLink(
+        deployDocUrl
+      )}\n`
+    );
+    console.log('Then copy and paste the rest of this output into the bug:');
+
+    deployDocContent.push(
+      `### Deploy doc notes\n\n[Replace with any notes for Train ${train}]`,
+      `### QA requests\n\n* Marked **needs:qa** (FxA): ${createQaIssuesUrl(
+        'fxa'
+      )}\n* Marked **qa+** (SubPlat): ${createQaIssuesUrl('subplat')}`
+    );
+  } else if (type === 'patch') {
+    console.log(
+      `Don't forget to leave a comment in the deploy bug for Train ${train}, copying the following output into it:`
+    );
+  }
+
+  if (modifiedPackages.length > 0) {
+    deployDocContent.push(
+      `### Pertinent changelogs\n\n${modifiedPackages
+        .map((p) => `* ${repoUrl}/blob/${tag}/packages/${p}/CHANGELOG.md`)
+        .join('\n')}`
+    );
+  }
+
+  console.log(chalk.white.italic(`\n${deployDocContent.join('\n\n')}`));
 };
 
 export const commitTypes = {
   feat: 'New features',
   fix: 'Bug fixes',
+  docs: 'Documentation changes',
+  style: 'Code formatting',
   perf: 'Performance improvements',
   refactor: 'Code refactoring',
   revert: 'Reverted changes',
+  test: 'Test changes',
+  chore: 'Build tool or dependency changes',
   other: 'Other changes',
 };
 
@@ -409,11 +490,18 @@ export const parseCommits = (input: string): PackageCommit[] => {
             return null;
           }
 
-          Object.assign(commit, {
-            message: parts[3].trim(),
-            type: parts[1],
-            area: parts[2],
-          });
+          if (type in commitTypes) {
+            Object.assign(commit, {
+              message: parts[3].trim(),
+              type: parts[1],
+              area: parts[2],
+            });
+          } else {
+            Object.assign(commit, {
+              type: 'other',
+              message: rest,
+            });
+          }
         } else {
           Object.assign(commit, {
             type: 'other',
@@ -452,10 +540,6 @@ export const bumpVersions = (
   current: string,
   next: string
 ) => {
-  if (!packagePath || getValue('dry')) {
-    return;
-  }
-
   for (const file of versionedFiles) {
     const filePath = join(packagePath, file);
     if (existsSync(filePath)) {
@@ -463,5 +547,17 @@ export const bumpVersions = (
       content = content.replace(current, next);
       writeFileSync(filePath, content, 'utf8');
     }
+  }
+};
+
+export const bumpChangelog = (
+  packagePath: string,
+  current: string,
+  next: string,
+  message: string
+) => {
+  const changelogPath = join(packagePath, 'CHANGELOG.md');
+  if (existsSync(changelogPath)) {
+    prependFile.sync(changelogPath, `## ${next}\n\n${message}\n\n`);
   }
 };

@@ -7,6 +7,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { releasesPath } from '../constants';
 import {
   assertPresence,
+  capitalize,
   confirmPush,
   createReleaseFilePath,
   ensureReleasesPath,
@@ -59,33 +60,35 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     process.exit(1);
   }
 
-  console.log(
-    chalk.white(
-      `Resuming push for in-progress Release ${chalk.blue(options.id)}...`
-    )
-  );
-
   const doneLoading = loadingIndicator('Fetching Release details...');
   let data: ReleaseData;
 
   try {
     const response = retrieveReleaseData() as ReleaseData;
-    const { branch, tag } = response;
+    const { train, type, branch, tag, modifiedPackages } = response;
 
     if (options.verbose) {
       console.log(response);
     }
 
     assertPresence(
-      [branch, tag],
+      [train, type, branch, tag],
       'Required data not found in saved Release file'
     );
-    data = { branch, tag };
+    data = { train, type, branch, tag, modifiedPackages };
   } catch (err) {
     logError('There was a problem fetching the Release data', err);
   } finally {
     doneLoading();
   }
+
+  console.log(
+    chalk.white(
+      `Resuming push for in-progress ${chalk.blue(
+        `${data.tag} ${capitalize(data.type)} Release`
+      )} (${options.id})...`
+    )
+  );
 
   await confirmPush(data, false, options.id);
 });
