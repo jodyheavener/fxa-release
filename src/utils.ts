@@ -558,6 +558,7 @@ export const bumpChangelog = (
 ) => {
   const changelogPath = join(packagePath, 'CHANGELOG.md');
   if (existsSync(changelogPath)) {
+    // FIXME - just find and insert instead of prepending
     prependFile.sync(changelogPath, `## ${next}\n\n${message}\n\n`);
   }
 };

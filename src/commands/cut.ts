@@ -145,7 +145,7 @@ const bump = (
     message = Object.values(summaries).join('\n\n');
   }
 
-  if (packagePath) {
+  if (packagePath && !options.dry) {
     bumpChangelog(
       packagePath,
       currentVersion.version,
@@ -304,7 +304,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     .map((directory) => bump(directory, currentVersion, nextVersion))
     .filter((c) => c != null);
 
-  // FIXME
+  // FIXME - This doesn't appear to work as intended
   // execute(
   //   'git shortlog -s | cut -c8- | sort -f > AUTHORS',
   //   'Updating the authors file.',
