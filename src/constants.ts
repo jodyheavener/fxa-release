@@ -9,16 +9,21 @@ export const gitDefaults = {
   branch: 'main',
 };
 
-export const repoUrl = 'https://github.com/mozilla/fxa';
-export const privateRepoUrl = 'https://github.com/mozilla/fxa-private';
+export const repoUrls = {
+  public: 'https://github.com/mozilla/fxa',
+  private: 'https://github.com/mozilla/fxa-private',
+};
 
 export const envVarPrefix = 'FXAR';
 
 export const releasesPath = join(__dirname, 'releases');
 
+export const twoWeeks = 12096e5;
+export const twoWeeksAgo = new Date(new Date().getTime() - twoWeeks);
+
 export const deployBug = {
   file: join(process.cwd(), '_scripts', 'create-deploy-bug.url'),
-  url: `${privateRepoUrl}/_scripts/create-deploy-bug.url`,
+  url: `${repoUrls.private}/_scripts/create-deploy-bug.url`,
 };
 
 export const qaIssuesUrlBase = {
@@ -29,6 +34,9 @@ export const qaIssuesUrlBase = {
 
 export const deployDocUrl =
   'https://docs.google.com/document/d/1lc5T1ZvQZlhXY6j1l_VMeQT9rs1mN7yYIcHbRPR2IbQ';
+
+export const ecosystemDocsUrl =
+  'https://mozilla.github.io/ecosystem-platform/docs/fxa-engineering/release-process';
 
 export type ServiceSet = {
   restricted?: boolean;
@@ -68,11 +76,11 @@ export const serviceSets: Record<string, ServiceSet> = {
     production: 'https://api.accounts.firefox.com/__version__',
     staging: 'https://api-accounts.stage.mozaws.net/__version__',
   },
-  payments: {
-    development: 'http://localhost:3031/__version__',
-    production: '',
-    staging: '',
-  },
+  // payments: {
+  //   development: 'http://localhost:3031/__version__',
+  //   production: '',
+  //   staging: '',
+  // },
   profile: {
     development: 'http://localhost:1111/__version__',
     production: 'https://profile.accounts.firefox.com/__version__',
@@ -92,17 +100,17 @@ export const serviceSets: Record<string, ServiceSet> = {
     restricted: true,
     development: 'http://localhost:8091/__version__',
     production: 'https://fxa-admin-panel.prod.mozaws.net/__version__',
-    staging: '',
+    staging: 'https://fxa-admin-panel.stage.mozaws.net/__version__',
   },
-  'admin-server': {
-    restricted: true,
-    development: 'http://localhost:8095/__version__',
-    production: 'https://fxa-admin-panel.prod.mozaws.net/__version__',
-    staging: '',
-  },
-  '123done': {
-    development: 'http://localhost:8080/__version__',
-    production: '',
-    staging: '',
-  },
+  // 'admin-server': {
+  //   restricted: true,
+  //   development: 'http://localhost:8095/__version__',
+  //   production: 'https://fxa-admin-panel.prod.mozaws.net/__version__',
+  //   staging: 'https://fxa-admin-panel.stage.mozaws.net/__version__',
+  // },
+  // '123done': {
+  //   development: 'http://localhost:8080/__version__',
+  //   production: '',
+  //   staging: '',
+  // },
 };

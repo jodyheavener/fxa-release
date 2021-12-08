@@ -3,7 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import chalk from 'chalk';
-import { packages, repoUrl } from '../constants';
+import { writeFileSync } from 'fs';
+import { packages, repoUrls } from '../constants';
 import {
   assertAbsence,
   assertPresence,
@@ -12,6 +13,7 @@ import {
   capitalize,
   commitTypes,
   confirmPush,
+  createAuthorsFilePath,
   createEnvVar,
   createPackagePath,
   execute,
@@ -21,6 +23,7 @@ import {
   parseVersion,
   ReleaseType,
   unpad,
+  validateGitGpg,
   wrapCommand,
 } from '../utils';
 
@@ -108,6 +111,22 @@ const getTrainBranch = (type: 'local' | 'remote', train: number) => {
   }
 };
 
+const updateAuthors = () => {
+  logDryMessage('Updating AUTHORS file with contributors.');
+  const result = execute('git shortlog -s', 'Retrieving commit authors.');
+  const authors = [...result.matchAll(/^\s+\d\s+(.+)$/gm)].map(
+    (result) => result[1]
+  );
+
+  if (!options.dry) {
+    const authorsFilePath = createAuthorsFilePath();
+    writeFileSync(
+      authorsFilePath,
+      authors.sort((a, b) => a.length - b.length).join('\n')
+    );
+  }
+};
+
 const bump = (
   directory: string,
   currentVersion: ReleaseVersion,
@@ -132,7 +151,7 @@ const bump = (
           (commit) =>
             `\n- ${commit.area ? `${commit.area}: ` : ''}${commit.message} ([${
               commit.hash
-            }](${repoUrl}/commit/${commit.hash}))`
+            }](${repoUrls.public}/commit/${commit.hash}))`
         )
         .join('');
       summaries[type] = `### ${title}\n${items}`;
@@ -169,6 +188,8 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     );
     process.exit(1);
   }
+
+  validateGitGpg();
 
   console.log(
     chalk.white(
@@ -217,12 +238,22 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   const localTrainBranch = getTrainBranch('local', nextVersion.train);
 
   try {
+    if (currentBranch === options.defaultBranch) {
+      assertAbsence(
+        execute(
+          `git log ${options.remote}/${options.defaultBranch}..HEAD`,
+          'Ensuring the default branch is up to date with the remote.'
+        ),
+        `The default branch (${currentBranch}) has unpushed commits. Please push your commits before Releasing.`
+      );
+    }
+
     assertAbsence(
       execute(
         'git status --porcelain',
         'Ensuring the current branch is clean.'
       ),
-      `The current branch (${currentBranch}) is not clean. Please commit or stash your changes before releasing.`
+      `The current branch (${currentBranch}) is not clean. Please commit or stash your changes before Releasing.`
     );
 
     assertPresence(
@@ -304,12 +335,9 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     .map((directory) => bump(directory, currentVersion, nextVersion))
     .filter((c) => c != null);
 
-  // FIXME - This doesn't appear to work as intended
-  // execute(
-  //   'git shortlog -s | cut -c8- | sort -f > AUTHORS',
-  //   'Updating the authors file.',
-  //   true
-  // );
+  // TODO: this is not working
+  updateAuthors();
+
   execute(
     `git commit -a -m "Release ${nextVersion.version}"`,
     'Committing release changelog and version bump changes.',

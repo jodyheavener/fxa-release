@@ -8,6 +8,7 @@ import { Command } from 'commander';
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   unlinkSync,
   writeFileSync,
@@ -15,7 +16,6 @@ import {
 import { prompt } from 'inquirer';
 import logUpdate from 'log-update';
 import { join } from 'path';
-import prependFile from 'prepend-file';
 import terminalLink from 'terminal-link';
 import {
   deployBug,
@@ -24,7 +24,9 @@ import {
   gitDefaults,
   qaIssuesUrlBase,
   releasesPath,
-  repoUrl,
+  repoUrls,
+  twoWeeks,
+  twoWeeksAgo,
 } from './constants';
 
 // Global values
@@ -54,6 +56,13 @@ export const capitalize = (str: string) =>
   str.charAt(0).toUpperCase() + str.slice(1);
 
 export const commaSeparatedList = (value: string) => value.split(',');
+
+export const stringInsert = (existing: string, value: string, index: number) =>
+  index > 0
+    ? existing.substring(0, index) +
+      value +
+      existing.substring(index, existing.length)
+    : value + existing;
 
 export const parseVersion = (value: string) => {
   const [major, train, patch] = value.replace('v', '').split('.').map(Number);
@@ -171,7 +180,7 @@ export const wrapCommand =
       }
     }
 
-    // TODO - delete old Releases
+    removeOldReleases();
 
     if (getValue('dry')) {
       console.log(
@@ -206,6 +215,34 @@ const validateCommand = (remote?: string) => {
     ) === ''
   ) {
     logError(`Could not find the ${remote} Git remote.`);
+  }
+};
+
+const removeOldReleases = () => {
+  const twoWeeksAgoTimestamp = twoWeeksAgo.getTime();
+  const releasesToRemove = retrieveAvailableReleases().filter(
+    (releaseTimestamp) => twoWeeksAgoTimestamp > +releaseTimestamp
+  );
+  if (getValue('verbose')) {
+    console.log(
+      `Removing ${
+        releasesToRemove.length
+      } stored Releases that are older than two weeks: ${releasesToRemove.join(
+        ', '
+      )}`
+    );
+  }
+  releasesToRemove.forEach((release) => {
+    unlinkSync(join(releasesPath, `${release}.json`));
+  });
+};
+
+export const validateGitGpg = () => {
+  if (
+    execute('git config --get commit.gpgsign', 'Checking for GPG signing') !==
+    'true'
+  ) {
+    logError('GPG signing is not enabled for commits.');
   }
 };
 
@@ -281,6 +318,7 @@ export const execute = (
     console.log(`↪ ${prefix} ${command}`);
   }
 
+  // TODO: add options to return or silence stdout/stderr
   try {
     return skip
       ? null
@@ -290,6 +328,12 @@ export const execute = (
   }
 };
 
+export const retrieveAvailableReleases = () => {
+  ensureReleasesPath();
+  const files = readdirSync(releasesPath);
+  return files.map((f) => f.split('.')[0]);
+};
+
 const retrieveDeployBugURL = () => {
   if (existsSync(deployBug.file)) {
     return readFileSync(deployBug.file, 'utf8').trim();
@@ -297,11 +341,17 @@ const retrieveDeployBugURL = () => {
   return null;
 };
 
-const createQaIssuesUrl = (area: 'fxa' | 'subplat') => {
-  const twoWeeksAgo = new Date(new Date().getTime() - 12096e5);
-  return (
-    qaIssuesUrlBase[area] + encodeURIComponent(twoWeeksAgo.toLocaleDateString())
-  );
+const createQaIssuesUrl = (area: 'fxa' | 'subplat') =>
+  qaIssuesUrlBase[area] + encodeURIComponent(twoWeeksAgo.toLocaleDateString());
+
+export const createAuthorsFilePath = () => {
+  const authorsFilePath = join(process.cwd(), 'AUTHORS');
+
+  if (!existsSync(authorsFilePath)) {
+    throw new Error(`Could not find AUTHORS file: ${authorsFilePath}`);
+  }
+
+  return authorsFilePath;
 };
 
 export type ReleaseType = 'train' | 'patch';
@@ -381,7 +431,7 @@ export const confirmPush = async (
       `${chalk.yellow(
         '\nYour changes have not been pushed.'
       )} Your stored Release will be saved until ${chalk.white(
-        new Date(+id + 12096e5).toLocaleString()
+        new Date(+id + twoWeeks).toLocaleString()
       )}.`
     );
   }
@@ -394,7 +444,7 @@ export const confirmPush = async (
 
   unlinkSync(createReleaseFilePath(id));
 
-  const taggingUrl = `${repoUrl}/releases/tag/${tag}`;
+  const taggingUrl = `${repoUrls.public}/releases/tag/${tag}`;
 
   console.log(
     `${chalk.green(
@@ -402,7 +452,7 @@ export const confirmPush = async (
     )} Now you you must open pull a request to merge the changes back to ${getValue(
       'defaultBranch'
     )}:\n\n➤ ${visibleLink(
-      `${repoUrl}/compare/${branch}?expand=1&title=${encodeURIComponent(
+      `${repoUrls.public}/compare/${branch}?expand=1&title=${encodeURIComponent(
         `Release ${train}.${patch}`
       )}&body=${encodeURIComponent(
         `Train ${train}.${patch} has been [tagged](${taggingUrl}).`
@@ -413,7 +463,7 @@ export const confirmPush = async (
   );
 
   const deployDocContent = [
-    `## ${tag} is [tagged](${repoUrl}/releases/tag/${tag})`,
+    `## ${tag} is [tagged](${repoUrls.public}/releases/tag/${tag})`,
   ];
 
   if (type === 'train') {
@@ -448,7 +498,9 @@ export const confirmPush = async (
   if (modifiedPackages.length > 0) {
     deployDocContent.push(
       `### Pertinent changelogs\n\n${modifiedPackages
-        .map((p) => `* ${repoUrl}/blob/${tag}/packages/${p}/CHANGELOG.md`)
+        .map(
+          (p) => `* ${repoUrls.public}/blob/${tag}/packages/${p}/CHANGELOG.md`
+        )
         .join('\n')}`
     );
   }
@@ -566,9 +618,19 @@ export const bumpChangelog = (
   next: string,
   message: string
 ) => {
+  const changelogTitle = '# Change history';
   const changelogPath = join(packagePath, 'CHANGELOG.md');
   if (existsSync(changelogPath)) {
-    // FIXME - just find and insert instead of prepending
-    prependFile.sync(changelogPath, `## ${next}\n\n${message}\n\n`);
+    let content = readFileSync(changelogPath, 'utf8');
+    if (content.includes(changelogTitle)) {
+      content = stringInsert(
+        content,
+        `\n\n## ${next}\n\n${message}`,
+        content.indexOf(changelogTitle) + changelogTitle.length
+      );
+    } else {
+      content = `## ${next}\n\n${message}\n\n${content}`;
+    }
+    writeFileSync(changelogPath, content, 'utf8');
   }
 };

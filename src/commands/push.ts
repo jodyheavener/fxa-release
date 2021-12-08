@@ -3,17 +3,17 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import chalk from 'chalk';
-import { existsSync, readdirSync, readFileSync } from 'fs';
-import { releasesPath } from '../constants';
+import { existsSync, readFileSync } from 'fs';
 import {
   assertPresence,
   capitalize,
   confirmPush,
   createReleaseFilePath,
-  ensureReleasesPath,
   loadingIndicator,
   logError,
   ReleaseData,
+  retrieveAvailableReleases,
+  validateGitGpg,
   wrapCommand,
 } from '../utils';
 
@@ -40,12 +40,6 @@ const retrieveReleaseData = () => {
   return JSON.parse(readFileSync(path, 'utf8'));
 };
 
-const retrieveAvailableReleases = () => {
-  ensureReleasesPath();
-  const files = readdirSync(releasesPath);
-  return files.map((f) => chalk.white(f.split('.')[0]));
-};
-
 export default wrapCommand(async (opts: Record<string, any>) => {
   options = opts as Options;
 
@@ -57,7 +51,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     if (availableReleases.length > 0) {
       console.log(
         'The following Releases are available on your system:',
-        availableReleases.join(', ')
+        availableReleases.map((r) => chalk.white(r)).join(', ')
       );
     } else {
       console.log(
@@ -68,6 +62,8 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     }
     process.exit(1);
   }
+
+  validateGitGpg();
 
   const doneLoading = loadingIndicator('Fetching Release details...');
   let data: ReleaseData;

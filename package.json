@@ -22,7 +22,6 @@
     "inquirer": "^8.2.0",
     "log-update": "^4.0.0",
     "node-fetch": "^2.6.6",
-    "prepend-file": "^2.0.0",
     "terminal-link": "^2.1.1"
   },
   "devDependencies": {

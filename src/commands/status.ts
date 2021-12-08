@@ -5,7 +5,7 @@
 import chalk from 'chalk';
 import fetch from 'node-fetch';
 import terminalLink from 'terminal-link';
-import { packages, repoUrl, serviceSets } from '../constants';
+import { packages, repoUrls, serviceSets } from '../constants';
 import {
   assertPresence,
   loadingIndicator,
@@ -39,14 +39,14 @@ const formatDetails = (
     - Patch: ${patch}
     - Commit: ${terminalLink(
       shortCommit(commit),
-      `${repoUrl}/commit/${commit}`
+      `${repoUrls.public}/commit/${commit}`
     )}
-    - Tag: ${terminalLink(tag, `${repoUrl}/releases/tag/${tag}`)}
+    - Tag: ${terminalLink(tag, `${repoUrls.public}/releases/tag/${tag}`)}
     ${
       pckg
         ? `- Package: ${terminalLink(
             pckg,
-            `${repoUrl}/tree/${tag}/packages/${pckg}`
+            `${repoUrls.public}/tree/${tag}/packages/${pckg}`
           )}`
         : ''
     }`).trim();

@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import chalk from 'chalk';
-import { repoUrl } from '../constants';
+import { ecosystemDocsUrl, repoUrls } from '../constants';
 import { visibleLink, wrapCommand } from '../utils';
 
 const definitions = {
@@ -28,12 +28,12 @@ export default wrapCommand(() => {
   );
   console.log(
     `The main Firefox Accounts repository can be found at: ${visibleLink(
-      repoUrl
+      repoUrls.public
     )}`
   );
   console.log(
     `\nMore detailed information about the release process can be found in our Ecosystem Platform documentation: ${visibleLink(
-      'https://mozilla.github.io/ecosystem-platform/docs/fxa-engineering/release-process'
+      ecosystemDocsUrl
     )}`
   );
 
