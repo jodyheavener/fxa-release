@@ -97,7 +97,7 @@ const getTrainBranch = (
       name: localName,
       exists: exists(
         execute(
-          'git branch --no-color',
+          ['git', 'branch', '--no-color'],
           `Inspecting local branches to see if ${localName} branch exists.`
         ),
         localName
@@ -109,7 +109,7 @@ const getTrainBranch = (
       name: remoteName,
       exists: exists(
         execute(
-          'git branch --no-color -r',
+          ['git', 'branch', '--no-color', '-r'],
           `Inspecting remote branches to see if ${remoteName} branch exists.`
         ),
         remoteName
@@ -120,7 +120,10 @@ const getTrainBranch = (
 
 const updateAuthors = (): void => {
   logDryMessage('Updating AUTHORS file with contributors.');
-  const result = execute('git shortlog -s', 'Retrieving commit authors.');
+  const result = execute(
+    ['git', 'shortlog', '-s'],
+    'Retrieving commit authors.'
+  );
   const authors = [...result.matchAll(/^\s+\d\s+(.+)$/gm)].map(
     (result) => result[1]
   );
@@ -143,7 +146,16 @@ const bump = (
 
   const commits = parseCommits(
     execute(
-      `git log ${currentVersion.tag}..HEAD --no-color --pretty=oneline --abbrev-commit -- "packages/${directory}"`,
+      [
+        'git',
+        'log',
+        `${currentVersion.tag}..HEAD`,
+        '--no-color',
+        '--pretty=oneline',
+        '--abbrev-commit',
+        '--',
+        '"packages/${directory}"',
+      ],
       `Retrieving commits since ${currentVersion.tag} for ${directory}`
     )
   );
@@ -205,7 +217,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   );
 
   const currentBranch = execute(
-    'git rev-parse --abbrev-ref HEAD',
+    ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
     'Retrieving the current branch.'
   );
   let lastTag: string;
@@ -213,7 +225,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   if (options.type === 'train') {
     // When starting a train the last tag is the last recently created train tag.
     lastTag = execute(
-      'git tag -l --sort=version:refname',
+      ['git', 'tag', '-l', '--sort=version:refname'],
       'The Release type is "train"; retrieving the last Train Tag.'
     )
       .split('\n')
@@ -222,7 +234,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   } else if (options.type === 'patch') {
     // When we're on a train branch for a patch the current tag is last tag.
     lastTag = execute(
-      'git describe --tags --first-parent --abbrev=0',
+      ['git', 'describe', '--tags', '--first-parent', '--abbrev=0'],
       'The Release type is "patch"; retrieving the last Patch Tag in the current Release.'
     );
 
@@ -248,7 +260,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     if (currentBranch === options.defaultBranch) {
       assertAbsence(
         execute(
-          `git log ${options.remote}/${options.defaultBranch}..HEAD`,
+          ['git', 'log', `${options.remote}/${options.defaultBranch}..HEAD`],
           'Ensuring the default branch is up to date with the remote.'
         ),
         `The default branch (${currentBranch}) has unpushed commits. Please push your commits before Releasing.`
@@ -257,7 +269,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
 
     assertAbsence(
       execute(
-        'git status --porcelain',
+        ['git', 'status', '--porcelain'],
         'Ensuring the current branch is clean.'
       ),
       `The current branch (${currentBranch}) is not clean. Please commit or stash your changes before Releasing.`
@@ -265,7 +277,13 @@ export default wrapCommand(async (opts: Record<string, any>) => {
 
     assertPresence(
       execute(
-        `git log ${lastTag}..HEAD --pretty=oneline --abbrev-commit`,
+        [
+          'git',
+          'log',
+          `${lastTag}..HEAD`,
+          '--pretty=oneline',
+          '--abbrev-commit',
+        ],
         'Ensure there are new commits on the current branch since the last tagging.'
       ),
       `The current branch (${currentBranch}) has no new commits since the last release tag (${lastTag}).`
@@ -277,7 +295,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   // If current branch is train branch, pull from remote.
   if (currentBranch === localTrainBranch.name) {
     execute(
-      `git pull ${options.remote} ${localTrainBranch.name}`,
+      ['git', 'pull', options.remote, localTrainBranch.name],
       `The current branch is the train branch; pulling latest from it.`,
       { drySkip: true }
     );
@@ -289,7 +307,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
         "We are not on a train branch, but we found it locally so we'll switch to it and attempt to pull in the latest changes from the remote."
       );
       execute(
-        `git checkout ${localTrainBranch.name}`,
+        ['git', 'checkout', localTrainBranch.name],
         `Checking out the ${localTrainBranch.name} branch.`,
         {
           drySkip: true,
@@ -299,7 +317,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
         }
       );
       execute(
-        `git pull ${options.remote} ${localTrainBranch.name}`,
+        ['git', 'pull', options.remote, localTrainBranch.name],
         `Pulling the latest ${localTrainBranch.name} branch changes from ${options.remote} remote.`,
         {
           drySkip: true,
@@ -311,7 +329,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
         "We're not on a train branch; checking to see if one exists on the remote."
       );
       execute(
-        `git fetch ${options.remote} ${localTrainBranch.name}`,
+        ['git', 'fetch', options.remote, localTrainBranch.name],
         `Attempting to fetch the ${localTrainBranch.name} branch from ${options.remote} remote.`,
         { onStedError: ignoreStdErrUnless("couldn't find remote") }
       );
@@ -319,7 +337,14 @@ export default wrapCommand(async (opts: Record<string, any>) => {
       const remoteTrainBranch = getTrainBranch('remote', nextVersion.train);
       if (remoteTrainBranch.exists) {
         execute(
-          `git checkout --track -b ${localTrainBranch.name} ${remoteTrainBranch.name}`,
+          [
+            'git',
+            'checkout',
+            '--track',
+            '-b',
+            localTrainBranch.name,
+            remoteTrainBranch.name,
+          ],
           `Remote train branch found; checking it out and attaching it to the remote.`,
           {
             drySkip: true,
@@ -331,7 +356,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
           `${localTrainBranch.name} branch not found on local or remote; creating one from ${options.defaultBranch} branch.`
         );
         execute(
-          `git checkout ${options.defaultBranch}`,
+          ['git', 'checkout', options.defaultBranch],
           `Checking out the ${options.defaultBranch} branch.`,
           {
             drySkip: true,
@@ -341,7 +366,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
           }
         );
         execute(
-          `git pull ${options.remote} ${options.defaultBranch}`,
+          ['git', 'pull', options.remote, options.defaultBranch],
           `Pulling the latest ${options.defaultBranch} branch changes from ${options.remote} remote.`,
           {
             drySkip: true,
@@ -349,7 +374,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
           }
         );
         execute(
-          `git checkout -b ${localTrainBranch.name}`,
+          ['git', 'checkout', '-b', localTrainBranch.name],
           `Creating new ${localTrainBranch.name} branch off ${options.defaultBranch} branch.`,
           {
             drySkip: true,
@@ -369,14 +394,19 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   updateAuthors();
 
   execute(
-    `git commit -a -m "Release ${nextVersion.version}"`,
+    ['git', 'commit', '-a', '-m', `Release ${nextVersion.version}`],
     'Committing release changelog and version bump changes.',
     { drySkip: true }
   );
   execute(
-    `git tag -a "${nextVersion.tag}" -m "${capitalize(options.type)} release ${
-      nextVersion.version
-    }"`,
+    [
+      'git',
+      'tag',
+      '-a',
+      nextVersion.tag,
+      '-m',
+      `"${capitalize(options.type)} release ${nextVersion.version}"`,
+    ],
     `Tagging the code as ${nextVersion.tag}.`,
     { drySkip: true }
   );

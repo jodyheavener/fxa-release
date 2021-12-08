@@ -225,7 +225,7 @@ const validateCommand = (remote?: string): void => {
   if (
     remote &&
     execute(
-      `git ls-remote ${remote}`,
+      ['git', 'ls-remote', remote],
       `Checking the existence of the specified remote (${remote})`
     ) === ''
   ) {
@@ -254,8 +254,10 @@ const removeOldReleases = (): void => {
 
 export const validateGitGpg = (): void => {
   if (
-    execute('git config --get commit.gpgsign', 'Checking for GPG signing') !==
-    'true'
+    execute(
+      ['git', 'config', '--get', 'commit.gpgsign'],
+      'Checking for GPG signing'
+    ) !== 'true'
   ) {
     logError('GPG signing is not enabled for commits.');
   }
@@ -316,7 +318,7 @@ export const createReleaseFilePath = (id: string): string => {
 // Release operations
 
 export const execute = (
-  command: string,
+  command: string[],
   description: string,
   options: {
     drySkip?: boolean;
@@ -325,6 +327,7 @@ export const execute = (
 ): string | null => {
   const skip = (options.drySkip || false) && getValue('dry');
   const prefix = skip ? chalk.yellow('skipped:') : chalk.green('executed:');
+  const joinedCommand = command.join(' ');
 
   logDryMessage(description);
 
@@ -333,18 +336,18 @@ export const execute = (
       logInfo(description);
     }
 
-    console.log(`↪ ${prefix} ${command}`);
+    console.log(`↪ ${prefix} ${joinedCommand}`);
   }
 
   if (skip) {
     return null;
   }
 
-  const [base, ...args] = command.split(' ');
+  const [base, ...args] = command;
   const result = spawnSync(base, args, { cwd: process.cwd() });
 
   if (result.error) {
-    logError(`Command failed: ${command}`, result.error);
+    logError(`Command failed: ${joinedCommand}`, result.error);
   }
 
   const stderr = result.stderr.toString();
@@ -352,7 +355,7 @@ export const execute = (
     if (options.onStedError) {
       options.onStedError(stderr);
     } else if (options.onStedError !== false) {
-      logError(`Command failed: ${command}`, stderr);
+      logError(`Command failed: ${joinedCommand}`, stderr);
     }
   }
 
@@ -410,9 +413,16 @@ export const confirmPush = async (
   id?: string
 ): Promise<void> => {
   const remote = getValue('remote');
-  const pushCommitCommand = `git push ${remote} ${branch}:${branch}`;
-  const pushTagCommand = `git push ${remote} ${tag}`;
-  const combinedCommand = `${pushCommitCommand} && ${pushTagCommand}`;
+  const pushCommitCommand = [
+    'git',
+    'push',
+    remote as string,
+    `${branch}:${branch}`,
+  ];
+  const pushTagCommand = ['git', 'push', remote as string, tag];
+  const combinedCommand = `${pushCommitCommand.join(
+    ' '
+  )} && ${pushTagCommand.join(' ')}`;
 
   if (getValue('dry')) {
     logDryMessage('Asking for confirmation to push changes.');
