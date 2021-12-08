@@ -82,9 +82,15 @@ const getTrainVersions = (
   };
 };
 
-const getTrainBranch = (type: 'local' | 'remote', train: number) => {
+const getTrainBranch = (
+  type: 'local' | 'remote',
+  train: number
+): {
+  name: string;
+  exists: boolean;
+} => {
   const localName = `train-${train}`;
-  const exists = (lookup: string, value: string) =>
+  const exists = (lookup: string, value: string): boolean =>
     lookup.replace(/\*| /g, '').split('\n').includes(value);
   if (type === 'local') {
     return {
@@ -112,7 +118,7 @@ const getTrainBranch = (type: 'local' | 'remote', train: number) => {
   }
 };
 
-const updateAuthors = () => {
+const updateAuthors = (): void => {
   logDryMessage('Updating AUTHORS file with contributors.');
   const result = execute('git shortlog -s', 'Retrieving commit authors.');
   const authors = [...result.matchAll(/^\s+\d\s+(.+)$/gm)].map(
@@ -132,7 +138,7 @@ const bump = (
   directory: string,
   currentVersion: ReleaseVersion,
   nextVersion: ReleaseVersion
-) => {
+): string | null => {
   const packagePath = createPackagePath(directory);
 
   const commits = parseCommits(

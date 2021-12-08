@@ -40,31 +40,41 @@ const globals = {
   hasWarnings: false,
 };
 
-export const setValue = (key: keyof typeof globals, value: any) =>
+export const setValue = (key: keyof typeof globals, value: any): object =>
   Object.assign(globals, { [key]: value });
 
-export const getValue = (key: keyof typeof globals) =>
+export const getValue = (key: keyof typeof globals): string | boolean =>
   globals[key] as typeof globals[typeof key];
 
 // Content modifiers
 
-export const shortCommit = (commit: string) => commit.slice(0, 7);
+export const shortCommit = (commit: string): string => commit.slice(0, 7);
 
-export const unpad = (value: string) => value.replace(/^\s*/gm, '');
+export const unpad = (value: string): string => value.replace(/^\s*/gm, '');
 
-export const capitalize = (str: string) =>
+export const capitalize = (str: string): string =>
   str.charAt(0).toUpperCase() + str.slice(1);
 
-export const commaSeparatedList = (value: string) => value.split(',');
+export const commaSeparatedList = (value: string): string[] => value.split(',');
 
-export const stringInsert = (existing: string, value: string, index: number) =>
+export const stringInsert = (
+  existing: string,
+  value: string,
+  index: number
+): string =>
   index > 0
     ? existing.substring(0, index) +
       value +
       existing.substring(index, existing.length)
     : value + existing;
 
-export const parseVersion = (value: string) => {
+export const parseVersion = (
+  value: string
+): {
+  major: number;
+  train: number;
+  patch: number;
+} => {
   const [major, train, patch] = value.replace('v', '').split('.').map(Number);
   assert(
     [major, train, patch].every((part) => part != null),
@@ -73,23 +83,24 @@ export const parseVersion = (value: string) => {
   return { major, train, patch };
 };
 
-export const visibleLink = (url: string) => chalk.cyan(terminalLink(url, url));
+export const visibleLink = (url: string): string =>
+  chalk.cyan(terminalLink(url, url));
 
-export const createEnvVar = (name: string) =>
+export const createEnvVar = (name: string): string =>
   `${envVarPrefix}_${name}`.toUpperCase();
 
 // Assertions
 
-export const assert = (condition: boolean, message: string) => {
+export const assert = (condition: boolean, message: string): void => {
   if (!condition) {
     throw new Error(message);
   }
 };
 
-export function assertPresence(
+export const assertPresence = (
   values: string | string[],
   message: string
-): void {
+): void => {
   if (!Array.isArray(values)) {
     values = [values];
   }
@@ -97,12 +108,12 @@ export function assertPresence(
     values.every((part) => part != null && part !== ''),
     message
   );
-}
+};
 
-export function assertAbsence(
+export const assertAbsence = (
   values: string | string[],
   message: string
-): void {
+): void => {
   if (!Array.isArray(values)) {
     values = [values];
   }
@@ -110,16 +121,17 @@ export function assertAbsence(
     values.every((part) => part == null || part === ''),
     message
   );
-}
+};
 
 // Interface
 
-export const logInfo = (message: string) => console.log(chalk.italic(message));
+export const logInfo = (message: string): void =>
+  console.log(chalk.italic(message));
 
 export const logDryMessage = (
   message: string,
   type: 'info' | 'warning' | 'error' = 'info'
-) => {
+): void => {
   if (!getValue('dry')) {
     return;
   }
@@ -135,12 +147,12 @@ export const logDryMessage = (
   console.log(`- ${prefix}${message}`);
 };
 
-export const logWarning = (message: string) => {
+export const logWarning = (message: string): void => {
   setValue('hasWarnings', true);
   console.log(`${chalk.yellow('Warning!')} ${message}`);
 };
 
-export const logError = (message: string, err?: any) => {
+export const logError = (message: string, err?: any): void => {
   setValue('hasErrors', true);
   console.log(`${chalk.red('Bonk!')} ${message}`);
   err && console.trace(err);
@@ -149,7 +161,7 @@ export const logError = (message: string, err?: any) => {
   process.exit(1);
 };
 
-export const loadingIndicator = (message: string) => {
+export const loadingIndicator = (message: string): (() => void) => {
   const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   let index = 0;
 
@@ -158,7 +170,7 @@ export const loadingIndicator = (message: string) => {
     logUpdate(`${frame} ${message}`);
   }, 80);
 
-  return () => {
+  return (): void => {
     logUpdate.clear();
     clearInterval(interval);
   };
@@ -173,7 +185,10 @@ export const wrapCommand =
       program: InstanceType<typeof Command>
     ) => void | Promise<void>
   ) =>
-  async (opts: Record<string, any>, program: InstanceType<typeof Command>) => {
+  async (
+    opts: Record<string, any>,
+    program: InstanceType<typeof Command>
+  ): Promise<void> => {
     for (const key in opts) {
       if (key in globals) {
         setValue(key as any, opts[key]);
@@ -199,7 +214,7 @@ export const wrapCommand =
     completeCommand();
   };
 
-const validateCommand = (remote?: string) => {
+const validateCommand = (remote?: string): void => {
   const pckg = JSON.parse(
     readFileSync(join(process.cwd(), 'package.json'), 'utf8')
   );
@@ -218,7 +233,7 @@ const validateCommand = (remote?: string) => {
   }
 };
 
-const removeOldReleases = () => {
+const removeOldReleases = (): void => {
   const twoWeeksAgoTimestamp = twoWeeksAgo.getTime();
   const releasesToRemove = retrieveAvailableReleases().filter(
     (releaseTimestamp) => twoWeeksAgoTimestamp > +releaseTimestamp
@@ -237,7 +252,7 @@ const removeOldReleases = () => {
   });
 };
 
-export const validateGitGpg = () => {
+export const validateGitGpg = (): void => {
   if (
     execute('git config --get commit.gpgsign', 'Checking for GPG signing') !==
     'true'
@@ -246,7 +261,7 @@ export const validateGitGpg = () => {
   }
 };
 
-const completeCommand = () => {
+const completeCommand = (): void => {
   if (getValue('dry')) {
     if (getValue('hasErrors')) {
       console.log(
@@ -287,13 +302,13 @@ const completeCommand = () => {
 
 // File system
 
-export const ensureReleasesPath = () => {
+export const ensureReleasesPath = (): void => {
   if (!existsSync(releasesPath)) {
     mkdirSync(releasesPath);
   }
 };
 
-export const createReleaseFilePath = (id: string) => {
+export const createReleaseFilePath = (id: string): string => {
   ensureReleasesPath();
   return join(releasesPath, id + '.json');
 };
@@ -307,7 +322,7 @@ export const execute = (
     drySkip?: boolean;
     onStedError?: (input: string) => void;
   } = {}
-) => {
+): string | null => {
   const skip = (options.drySkip || false) && getValue('dry');
   const prefix = skip ? chalk.yellow('skipped:') : chalk.green('executed:');
 
@@ -345,30 +360,30 @@ export const execute = (
 };
 
 export const ignoreStdErrUnless = (value: string) => {
-  return (input: string) => {
+  return (input: string): void => {
     if (!input.includes(value)) {
       logError(`Command failed: ${input}`);
     }
   };
 };
 
-export const retrieveAvailableReleases = () => {
+export const retrieveAvailableReleases = (): string[] => {
   ensureReleasesPath();
   const files = readdirSync(releasesPath);
   return files.map((f) => f.split('.')[0]);
 };
 
-const retrieveDeployBugURL = () => {
+const retrieveDeployBugURL = (): string => {
   if (existsSync(deployBug.file)) {
     return readFileSync(deployBug.file, 'utf8').trim();
   }
   return null;
 };
 
-const createQaIssuesUrl = (area: 'fxa' | 'subplat') =>
+const createQaIssuesUrl = (area: 'fxa' | 'subplat'): string =>
   qaIssuesUrlBase[area] + encodeURIComponent(twoWeeksAgo.toLocaleDateString());
 
-export const createAuthorsFilePath = () => {
+export const createAuthorsFilePath = (): string => {
   const authorsFilePath = join(process.cwd(), 'AUTHORS');
 
   if (!existsSync(authorsFilePath)) {
@@ -393,7 +408,7 @@ export const confirmPush = async (
   { train, patch, type, branch, tag, modifiedPackages }: ReleaseData,
   save: boolean,
   id?: string
-) => {
+): Promise<void> => {
   const remote = getValue('remote');
   const pushCommitCommand = `git push ${remote} ${branch}:${branch}`;
   const pushTagCommand = `git push ${remote} ${tag}`;
@@ -453,13 +468,14 @@ export const confirmPush = async (
 
   if (confirm !== 'push') {
     // Store the release for 2 weeks
-    return console.log(
+    console.log(
       `${chalk.yellow(
         '\nYour changes have not been pushed.'
       )} Your stored Release will be saved until ${chalk.white(
         new Date(+id + twoWeeks).toLocaleString()
       )}.`
     );
+    return;
   }
 
   execute(
@@ -608,7 +624,7 @@ export const parseCommits = (input: string): PackageCommit[] => {
   return commits;
 };
 
-export const createPackagePath = (directory: string) => {
+export const createPackagePath = (directory: string): string => {
   const packagesPath = join(process.cwd(), 'packages');
 
   if (!existsSync(packagesPath)) {
@@ -630,7 +646,7 @@ export const bumpVersions = (
   packagePath: string,
   current: string,
   next: string
-) => {
+): void => {
   for (const file of versionedFiles) {
     const filePath = join(packagePath, file);
     if (existsSync(filePath)) {
@@ -646,7 +662,7 @@ export const bumpChangelog = (
   current: string,
   next: string,
   message: string
-) => {
+): void => {
   const changelogTitle = '# Change history';
   const changelogPath = join(packagePath, 'CHANGELOG.md');
   if (existsSync(changelogPath)) {

@@ -26,7 +26,7 @@ type Options = {
 
 let options: Options;
 
-const retrieveReleaseData = () => {
+const retrieveReleaseData = (): ReleaseData => {
   const path = createReleaseFilePath(options.id);
 
   if (options.verbose) {
@@ -69,7 +69,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   let data: ReleaseData;
 
   try {
-    const response = retrieveReleaseData() as ReleaseData;
+    const response = retrieveReleaseData();
     const { train, patch, type, branch, tag, modifiedPackages } = response;
 
     if (options.verbose) {

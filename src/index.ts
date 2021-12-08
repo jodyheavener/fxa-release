@@ -40,7 +40,7 @@ const addCommand = (
     options: Record<string, any>,
     command: InstanceType<typeof Command>
   ) => Promise<void>
-) => {
+): InstanceType<typeof Command> => {
   const command = new Command(name);
   command.description(description);
   command.action(action);

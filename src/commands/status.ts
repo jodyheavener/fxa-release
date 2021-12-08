@@ -31,7 +31,7 @@ type ServiceVersionData = { version: string; commit: string };
 const formatDetails = (
   service: string,
   { version, commit }: ServiceVersionData
-) => {
+): string => {
   const pckg = packages[service] as string | undefined;
   const { train, patch } = parseVersion(version);
   const tag = `v${version}`;
