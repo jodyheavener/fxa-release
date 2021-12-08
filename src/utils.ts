@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import chalk from 'chalk';
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { Command } from 'commander';
 import {
   existsSync,
@@ -303,9 +303,12 @@ export const createReleaseFilePath = (id: string) => {
 export const execute = (
   command: string,
   description: string,
-  drySkip = false
+  options: {
+    drySkip?: boolean;
+    onStedError?: (input: string) => void;
+  } = {}
 ) => {
-  const skip = drySkip && getValue('dry');
+  const skip = (options.drySkip || false) && getValue('dry');
   const prefix = skip ? chalk.yellow('skipped:') : chalk.green('executed:');
 
   logDryMessage(description);
@@ -318,14 +321,35 @@ export const execute = (
     console.log(`↪ ${prefix} ${command}`);
   }
 
-  // TODO: add options to return or silence stdout/stderr
-  try {
-    return skip
-      ? null
-      : execSync(command, { cwd: process.cwd() }).toString().trim();
-  } catch (error) {
+  if (skip) {
     return null;
   }
+
+  const [base, ...args] = command.split(' ');
+  const result = spawnSync(base, args, { cwd: process.cwd() });
+
+  if (result.error) {
+    logError(`Command failed: ${command}`, result.error);
+  }
+
+  const stderr = result.stderr.toString();
+  if (stderr.length > 0) {
+    if (options.onStedError) {
+      options.onStedError(stderr);
+    } else {
+      logError(`Command failed: ${command}`, stderr);
+    }
+  }
+
+  return result.stdout.toString().trim();
+};
+
+export const ignoreStdErrUnless = (value: string) => {
+  return (input: string) => {
+    if (!input.includes(value)) {
+      logError(`Command failed: ${input}`);
+    }
+  };
 };
 
 export const retrieveAvailableReleases = () => {
@@ -371,13 +395,15 @@ export const confirmPush = async (
   id?: string
 ) => {
   const remote = getValue('remote');
-  const command = `git push ${remote} ${branch}:${branch} && git push ${remote} ${tag}`;
+  const pushCommitCommand = `git push ${remote} ${branch}:${branch}`;
+  const pushTagCommand = `git push ${remote} ${tag}`;
+  const combinedCommand = `${pushCommitCommand} && ${pushTagCommand}`;
 
   if (getValue('dry')) {
     logDryMessage('Asking for confirmation to push changes.');
 
     if (getValue('verbose')) {
-      console.log(`↪ ${chalk.magenta('proposed:')} ${command}`);
+      console.log(`↪ ${chalk.magenta('proposed:')} ${combinedCommand}`);
     }
 
     return;
@@ -437,10 +463,13 @@ export const confirmPush = async (
   }
 
   execute(
-    command,
-    `Pushing Release commits and tag to remote ${remote}.`,
-    true
+    pushCommitCommand,
+    `Pushing Release commit and tag to remote ${remote}.`,
+    { drySkip: true }
   );
+  execute(pushTagCommand, `Pushing Release tag to remote ${remote}.`, {
+    drySkip: true,
+  });
 
   unlinkSync(createReleaseFilePath(id));
 

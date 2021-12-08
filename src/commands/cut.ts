@@ -17,6 +17,7 @@ import {
   createEnvVar,
   createPackagePath,
   execute,
+  ignoreStdErrUnless,
   logDryMessage,
   logError,
   parseCommits,
@@ -272,7 +273,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     execute(
       `git pull ${options.remote} ${localTrainBranch.name}`,
       `The current branch is the train branch; pulling latest from it.`,
-      true
+      { drySkip: true }
     );
   }
   // Otherwise checkout existing train branch or create a fresh one from the default branch.
@@ -284,20 +285,21 @@ export default wrapCommand(async (opts: Record<string, any>) => {
       execute(
         `git checkout ${localTrainBranch.name}`,
         `Checking out the ${localTrainBranch.name} branch.`,
-        true
+        { drySkip: true }
       );
       execute(
         `git pull ${options.remote} ${localTrainBranch.name}`,
         `Pulling the latest ${localTrainBranch.name} branch changes from ${options.remote} remote.`,
-        true
+        { drySkip: true }
       );
     } else {
       logDryMessage(
         "We're not on a train branch; checking to see if one exists on the remote."
       );
       execute(
-        `git fetch ${options.remote} ${localTrainBranch.name} > /dev/null 2>&1`,
-        `Attempting to fetch the ${localTrainBranch.name} branch from ${options.remote} remote.`
+        `git fetch ${options.remote} ${localTrainBranch.name}`,
+        `Attempting to fetch the ${localTrainBranch.name} branch from ${options.remote} remote.`,
+        { onStedError: ignoreStdErrUnless("couldn't find remote") }
       );
 
       const remoteTrainBranch = getTrainBranch('remote', nextVersion.train);
@@ -305,26 +307,26 @@ export default wrapCommand(async (opts: Record<string, any>) => {
         execute(
           `git checkout --track -b ${localTrainBranch.name} ${remoteTrainBranch.name}`,
           `Remote train branch found; checking it out and attaching it to the remote.`,
-          true
+          { drySkip: true }
         );
       } else {
         logDryMessage(
           `${localTrainBranch.name} branch not found on local or remote; creating one from ${options.defaultBranch} branch.`
         );
         execute(
-          `git checkout ${options.defaultBranch} > /dev/null 2>&1`,
+          `git checkout ${options.defaultBranch}`,
           `Checking out the ${options.defaultBranch} branch.`,
-          true
+          { drySkip: true }
         );
         execute(
           `git pull ${options.remote} ${options.defaultBranch}`,
           `Pulling the latest ${options.defaultBranch} branch changes from ${options.remote} remote.`,
-          true
+          { drySkip: true }
         );
         execute(
           `git checkout -b ${localTrainBranch.name}`,
           `Creating new ${localTrainBranch.name} branch off ${options.defaultBranch} branch.`,
-          true
+          { drySkip: true }
         );
       }
     }
@@ -341,14 +343,14 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   execute(
     `git commit -a -m "Release ${nextVersion.version}"`,
     'Committing release changelog and version bump changes.',
-    true
+    { drySkip: true }
   );
   execute(
     `git tag -a "${nextVersion.tag}" -m "${capitalize(options.type)} release ${
       nextVersion.version
     }"`,
     `Tagging the code as ${nextVersion.tag}.`,
-    true
+    { drySkip: true }
   );
 
   if (!options.dry) {
