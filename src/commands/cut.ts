@@ -291,12 +291,20 @@ export default wrapCommand(async (opts: Record<string, any>) => {
       execute(
         `git checkout ${localTrainBranch.name}`,
         `Checking out the ${localTrainBranch.name} branch.`,
-        { drySkip: true }
+        {
+          drySkip: true,
+          onStedError: ignoreStdErrUnless(
+            `Already on '${localTrainBranch.name}'`
+          ),
+        }
       );
       execute(
         `git pull ${options.remote} ${localTrainBranch.name}`,
         `Pulling the latest ${localTrainBranch.name} branch changes from ${options.remote} remote.`,
-        { drySkip: true }
+        {
+          drySkip: true,
+          onStedError: false,
+        }
       );
     } else {
       logDryMessage(
@@ -313,7 +321,10 @@ export default wrapCommand(async (opts: Record<string, any>) => {
         execute(
           `git checkout --track -b ${localTrainBranch.name} ${remoteTrainBranch.name}`,
           `Remote train branch found; checking it out and attaching it to the remote.`,
-          { drySkip: true }
+          {
+            drySkip: true,
+            onStedError: ignoreStdErrUnless('Switched to a new branch'),
+          }
         );
       } else {
         logDryMessage(
@@ -322,17 +333,28 @@ export default wrapCommand(async (opts: Record<string, any>) => {
         execute(
           `git checkout ${options.defaultBranch}`,
           `Checking out the ${options.defaultBranch} branch.`,
-          { drySkip: true }
+          {
+            drySkip: true,
+            onStedError: ignoreStdErrUnless(
+              `Already on '${options.defaultBranch}'`
+            ),
+          }
         );
         execute(
           `git pull ${options.remote} ${options.defaultBranch}`,
           `Pulling the latest ${options.defaultBranch} branch changes from ${options.remote} remote.`,
-          { drySkip: true }
+          {
+            drySkip: true,
+            onStedError: false,
+          }
         );
         execute(
           `git checkout -b ${localTrainBranch.name}`,
           `Creating new ${localTrainBranch.name} branch off ${options.defaultBranch} branch.`,
-          { drySkip: true }
+          {
+            drySkip: true,
+            onStedError: ignoreStdErrUnless('Switched to a new branch'),
+          }
         );
       }
     }

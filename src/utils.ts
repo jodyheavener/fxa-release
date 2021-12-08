@@ -320,7 +320,7 @@ export const execute = (
   description: string,
   options: {
     drySkip?: boolean;
-    onStedError?: (input: string) => void;
+    onStedError?: ((input: string) => void) | false;
   } = {}
 ): string | null => {
   const skip = (options.drySkip || false) && getValue('dry');
@@ -351,7 +351,7 @@ export const execute = (
   if (stderr.length > 0) {
     if (options.onStedError) {
       options.onStedError(stderr);
-    } else {
+    } else if (options.onStedError !== false) {
       logError(`Command failed: ${command}`, stderr);
     }
   }
