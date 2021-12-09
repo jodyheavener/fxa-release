@@ -124,7 +124,8 @@ const updateAuthors = (): void => {
     ['git', 'shortlog', '-s'],
     'Retrieving commit authors.'
   );
-  const authors = [...result.matchAll(/^\s+\d\s+(.+)$/gm)].map(
+
+  const authors = [...result.matchAll(/^\s+\d\s|\t+(.+)$/gm)].map(
     (result) => result[1]
   );
 
@@ -153,8 +154,7 @@ const bump = (
         '--no-color',
         '--pretty=oneline',
         '--abbrev-commit',
-        '--',
-        '"packages/${directory}"',
+        `-- "packages/${directory}"`,
       ],
       `Retrieving commits since ${currentVersion.tag} for ${directory}`
     )
@@ -394,7 +394,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
   updateAuthors();
 
   execute(
-    ['git', 'commit', '-a', '-m', `Release ${nextVersion.version}`],
+    ['git', 'commit', '-a', '-m', `"Release ${nextVersion.version}"`],
     'Committing release changelog and version bump changes.',
     { drySkip: true }
   );

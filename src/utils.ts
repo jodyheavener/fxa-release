@@ -147,6 +147,12 @@ export const logDryMessage = (
   console.log(`- ${prefix}${message}`);
 };
 
+export const logVerbose = (message: any): void => {
+  if (getValue('verbose')) {
+    console.log(message);
+  }
+};
+
 export const logWarning = (message: string): void => {
   setValue('hasWarnings', true);
   console.log(`${chalk.yellow('Warning!')} ${message}`);
@@ -238,15 +244,13 @@ const removeOldReleases = (): void => {
   const releasesToRemove = retrieveAvailableReleases().filter(
     (releaseTimestamp) => twoWeeksAgoTimestamp > +releaseTimestamp
   );
-  if (getValue('verbose')) {
-    console.log(
-      `Removing ${
-        releasesToRemove.length
-      } stored Releases that are older than two weeks: ${releasesToRemove.join(
-        ', '
-      )}`
-    );
-  }
+  logVerbose(
+    `Removing ${
+      releasesToRemove.length
+    } stored Releases that are older than two weeks: ${releasesToRemove.join(
+      ', '
+    )}`
+  );
   releasesToRemove.forEach((release) => {
     unlinkSync(join(releasesPath, `${release}.json`));
   });
@@ -288,13 +292,11 @@ const completeCommand = (): void => {
       chalk.red('\nThere were errors during the execution of this command.')
     );
 
-    if (!getValue('verbose')) {
-      console.log(
-        `Re-run this command with the ${chalk.white(
-          '--verbose'
-        )} flag for more details`
-      );
-    }
+    logVerbose(
+      `Re-run this command with the ${chalk.white(
+        '--verbose'
+      )} flag for more details`
+    );
   } else if (getValue('hasWarnings')) {
     console.log(chalk.yellow('\nCompleted with warnings.'));
   } else {
@@ -344,7 +346,11 @@ export const execute = (
   }
 
   const [base, ...args] = command;
-  const result = spawnSync(base, args, { cwd: process.cwd() });
+  const result = spawnSync(base, args, {
+    cwd: process.cwd(),
+    shell: true,
+    stdio: ['inherit', 'pipe', 'pipe'],
+  });
 
   if (result.error) {
     logError(`Command failed: ${joinedCommand}`, result.error);
@@ -427,9 +433,7 @@ export const confirmPush = async (
   if (getValue('dry')) {
     logDryMessage('Asking for confirmation to push changes.');
 
-    if (getValue('verbose')) {
-      console.log(`↪ ${chalk.magenta('proposed:')} ${combinedCommand}`);
-    }
+    logVerbose(`↪ ${chalk.magenta('proposed:')} ${combinedCommand}`);
 
     return;
   }
@@ -491,10 +495,11 @@ export const confirmPush = async (
   execute(
     pushCommitCommand,
     `Pushing Release commit and tag to remote ${remote}.`,
-    { drySkip: true }
+    { drySkip: true, onStedError: false }
   );
   execute(pushTagCommand, `Pushing Release tag to remote ${remote}.`, {
     drySkip: true,
+    onStedError: false,
   });
 
   unlinkSync(createReleaseFilePath(id));

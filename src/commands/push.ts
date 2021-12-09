@@ -11,6 +11,7 @@ import {
   createReleaseFilePath,
   loadingIndicator,
   logError,
+  logVerbose,
   ReleaseData,
   retrieveAvailableReleases,
   validateGitGpg,
@@ -29,9 +30,7 @@ let options: Options;
 const retrieveReleaseData = (): ReleaseData => {
   const path = createReleaseFilePath(options.id);
 
-  if (options.verbose) {
-    console.log(`Fetching ${path}`);
-  }
+  logVerbose(`Fetching ${path}`);
 
   if (!existsSync(path)) {
     throw new Error(`Could not find saved Release file for ${options.id}`);
@@ -72,9 +71,7 @@ export default wrapCommand(async (opts: Record<string, any>) => {
     const response = retrieveReleaseData();
     const { train, patch, type, branch, tag, modifiedPackages } = response;
 
-    if (options.verbose) {
-      console.log(response);
-    }
+    logVerbose(response);
 
     assertPresence(
       [train, patch, type, branch, tag],
