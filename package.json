@@ -1,6 +1,6 @@
 {
   "name": "fxa-release",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A CLI for managing releases in Firefox Accounts",
   "repository": "https://github.com/jodyheavener/fxa-release",
   "author": "Jody Heavener <j.heavener@gmail.com>",
